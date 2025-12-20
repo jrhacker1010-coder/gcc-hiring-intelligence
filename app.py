@@ -157,7 +157,7 @@ elif menu == "Bulk Resume Screening":
 
             df.insert(0, "Rank", range(1, len(df) + 1))
 
-            )
+            
 
             st.markdown("### 🧠 AI Screening Results")
             st.dataframe(df, use_container_width=True)
@@ -227,6 +227,7 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
 
 
