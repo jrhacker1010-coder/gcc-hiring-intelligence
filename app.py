@@ -4,10 +4,11 @@ import re
 from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from datetime import datetime
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="GCC AI Hiring Decision Platform",
+    page_title="GCC AI Hiring Intelligence Platform",
     layout="wide"
 )
 
@@ -17,8 +18,18 @@ st.markdown("""
 body { background-color: #f5f7fa; }
 [data-testid="stSidebar"] { background-color: #0f172a; }
 [data-testid="stSidebar"] * { color: white; }
+.comment-box {
+    background:#ffffff;
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:10px;
+}
 </style>
 """, unsafe_allow_html=True)
+
+# ---------------- SESSION STATE ----------------
+if "interview_feedback" not in st.session_state:
+    st.session_state.interview_feedback = []
 
 # ---------------- LOAD SKILLS DATABASE ----------------
 @st.cache_data
@@ -28,154 +39,158 @@ def load_skills_db():
 
 SKILLS_DB = load_skills_db()
 
-# ---------------- HELPERS ----------------
+# ---------------- CORE RESUME AI (UNCHANGED) ----------------
 def extract_text_from_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
-    text = []
-    for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text.append(page_text)
-    return " ".join(text).lower()
+    return " ".join(
+        page.extract_text() or "" for page in reader.pages
+    ).lower()
 
 def extract_skills(text):
-    return sorted({skill for skill in SKILLS_DB if skill in text})
+    return sorted({s for s in SKILLS_DB if s in text})
 
 def extract_jd_skills(jd_text):
-    jd_text = jd_text.lower()
-    return sorted({skill for skill in SKILLS_DB if skill in jd_text})
+    return sorted({s for s in SKILLS_DB if s in jd_text.lower()})
 
-def compare_skills(jd_skills, resume_skills):
-    matched = sorted(set(jd_skills) & set(resume_skills))
-    missing = sorted(set(jd_skills) - set(resume_skills))
-    return matched, missing
+def compare_skills(jd, resume):
+    return sorted(set(jd) & set(resume)), sorted(set(jd) - set(resume))
 
 def extract_experience(text):
-    patterns = [
-        r"(\d+)\+?\s*years",
-        r"(\d+)\s*yrs",
-        r"(\d+)\s*years of experience"
-    ]
-    years = []
-    for p in patterns:
-        matches = re.findall(p, text.lower())
-        for m in matches:
-            years.append(int(m))
-    return max(years) if years else 0
+    years = re.findall(r"(\d+)\s*(?:years|yrs)", text.lower())
+    return max(map(int, years)) if years else 0
 
 def compute_match_score(jd, resume):
     tfidf = TfidfVectorizer(stop_words="english")
-    vectors = tfidf.fit_transform([jd, resume])
-    return round(cosine_similarity(vectors)[0][1] * 100, 2)
+    vec = tfidf.fit_transform([jd, resume])
+    return round(cosine_similarity(vec)[0][1] * 100, 2)
 
-# ---------------- INTERVIEW & ASSESSMENT AI ----------------
-def interview_feedback_score(comm, tech, culture):
-    return round((comm + tech + culture) / 3, 2)
+# ---------------- INTERVIEW AI ----------------
+def interview_score(c, t, f):
+    return round((c + t + f) / 3, 2)
 
-def final_candidate_score(resume, interview, assessment):
-    return round(
-        (resume * 0.5) +
-        (interview * 0.3) +
-        (assessment * 0.2),
-        2
-    )
+def final_score(resume, interview, assessment):
+    return round(resume * 0.5 + interview * 0.3 + assessment * 0.2, 2)
 
 def final_decision(score):
     if score >= 75:
         return "HIRE"
     elif score >= 60:
         return "HOLD"
-    else:
-        return "REJECT"
+    return "REJECT"
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
-menu = st.sidebar.radio("Menu", ["Dashboard", "Bulk Resume Screening"])
+menu = st.sidebar.radio(
+    "Menu",
+    [
+        "Dashboard",
+        "Resume Screening",
+        "Interview & Decision",
+        "Interviewee Feedback",
+        "Hiring Assistant"
+    ]
+)
 
 # ---------------- DASHBOARD ----------------
 if menu == "Dashboard":
     st.title("Executive Hiring Dashboard")
+    st.success("End-to-End AI-Driven GCC Hiring Intelligence Platform")
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Resume Screening", "AI + NLP")
-    c2.metric("Interview Evaluation", "Structured Feedback")
-    c3.metric("Decision Engine", "Explainable AI")
+# ---------------- RESUME SCREENING ----------------
+elif menu == "Resume Screening":
+    st.title("📄 Resume Screening")
 
-    st.success("AI-Driven GCC Hiring Intelligence Platform")
+    jd = st.text_area("Job Description")
+    files = st.file_uploader("Upload Resumes", type=["pdf"], accept_multiple_files=True)
 
-# ---------------- BULK SCREENING ----------------
-elif menu == "Bulk Resume Screening":
-    st.title("📄 End-to-End Candidate Evaluation")
+    if st.button("Screen"):
+        rows = []
+        jd_skills = extract_jd_skills(jd)
 
-    jd = st.text_area("📌 Job Description", height=180)
+        for f in files:
+            text = extract_text_from_pdf(f)
+            score = compute_match_score(jd.lower(), text)
+            skills = extract_skills(text)
+            matched, missing = compare_skills(jd_skills, skills)
 
-    uploaded_files = st.file_uploader(
-        "📤 Upload Candidate Resumes (PDF)",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
+            rows.append({
+                "Candidate": f.name.replace(".pdf",""),
+                "Score": score,
+                "Matched Skills": ", ".join(matched),
+                "Missing Skills": ", ".join(missing)
+            })
 
-    st.markdown("## 🗣️ Interview Feedback (Structured)")
-    col1, col2, col3 = st.columns(3)
+        st.dataframe(pd.DataFrame(rows).sort_values("Score", ascending=False))
 
-    with col1:
-        communication = st.slider("Communication", 0, 100, 70)
-    with col2:
-        technical = st.slider("Technical Skills", 0, 100, 75)
-    with col3:
-        culture = st.slider("Cultural Fit", 0, 100, 80)
+# ---------------- INTERVIEW & DECISION ----------------
+elif menu == "Interview & Decision":
+    st.title("🎤 Interview Evaluation")
 
-    st.markdown("## 🧪 Assessment Score")
-    assessment = st.slider("Assessment Result", 0, 100, 72)
+    resume_score = st.slider("Resume Score", 0, 100, 70)
+    comm = st.slider("Communication", 0, 100, 75)
+    tech = st.slider("Technical", 0, 100, 80)
+    culture = st.slider("Cultural Fit", 0, 100, 78)
+    assessment = st.slider("Assessment Score", 0, 100, 72)
 
-    if st.button("Evaluate Candidates"):
-        if not jd or not uploaded_files:
-            st.warning("Please upload Job Description and Resumes.")
+    i_score = interview_score(comm, tech, culture)
+    f_score = final_score(resume_score, i_score, assessment)
+    decision = final_decision(f_score)
+
+    st.metric("Final Score", f_score)
+    st.success(f"Decision: {decision}")
+
+    if st.button("📧 Send Interview Result Email"):
+        st.info("Email Sent Successfully (Simulated)")
+        st.write(
+            f"""
+            **Subject:** Interview Result  
+            **Status:** {decision}  
+            **Final Score:** {f_score}%  
+            **Top-10 Shortlisting:** {"Yes" if f_score > 70 else "No"}
+            """
+        )
+
+# ---------------- INTERVIEWEE FEEDBACK (UNIQUE FEATURE) ----------------
+elif menu == "Interviewee Feedback":
+    st.title("💬 Interview Experience (Candidate Voice)")
+
+    name = st.text_input("Your Name")
+    role = st.text_input("Role Interviewed For")
+    rating = st.slider("Interview Experience Rating", 1, 5, 4)
+    comment = st.text_area("Share your interview experience")
+
+    if st.button("Post Feedback"):
+        st.session_state.interview_feedback.append({
+            "name": name,
+            "role": role,
+            "rating": rating,
+            "comment": comment,
+            "time": datetime.now().strftime("%d %b %Y")
+        })
+        st.success("Thank you for your feedback!")
+
+    st.markdown("### 📢 Candidate Comments")
+    for fb in reversed(st.session_state.interview_feedback):
+        st.markdown(
+            f"""
+            <div class="comment-box">
+            <b>{fb['name']}</b> — {fb['role']} ⭐{fb['rating']}<br>
+            {fb['comment']}<br>
+            <small>{fb['time']}</small>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+# ---------------- CHATBOT ----------------
+elif menu == "Hiring Assistant":
+    st.title("🤖 Hiring Assistant")
+
+    q = st.text_input("Ask hiring insights")
+    if q:
+        if "best" in q.lower():
+            st.write("Candidates with high interview and resume scores are recommended.")
+        elif "feedback" in q.lower():
+            st.write("Interviewee feedback improves transparency and employer branding.")
         else:
-            results = []
-            jd_skills = extract_jd_skills(jd)
-
-            interview_score = interview_feedback_score(
-                communication, technical, culture
-            )
-
-            for file in uploaded_files:
-                resume_text = extract_text_from_pdf(file)
-
-                resume_score = compute_match_score(jd.lower(), resume_text)
-                final_score = final_candidate_score(
-                    resume_score, interview_score, assessment
-                )
-
-                decision = final_decision(final_score)
-
-                skills = extract_skills(resume_text)
-                matched, missing = compare_skills(jd_skills, skills)
-                exp = extract_experience(resume_text)
-
-                results.append({
-                    "Candidate": file.name.replace(".pdf", ""),
-                    "Resume Score": resume_score,
-                    "Interview Score": interview_score,
-                    "Assessment Score": assessment,
-                    "Final Score": final_score,
-                    "Final Decision": decision,
-                    "Experience": exp,
-                    "Matched Skills": ", ".join(matched),
-                    "Missing Skills": ", ".join(missing)
-                })
-
-            df = pd.DataFrame(results).sort_values(
-                by="Final Score", ascending=False
-            )
-
-            st.markdown("### 🧠 AI Final Decision Scorecard")
-            st.dataframe(df, use_container_width=True)
-
-            for _, row in df.iterrows():
-                with st.expander(f"📄 {row['Candidate']} — {row['Final Decision']}"):
-                    st.write(f"Resume Score: {row['Resume Score']}%")
-                    st.write(f"Interview Score: {row['Interview Score']}%")
-                    st.write(f"Assessment Score: {row['Assessment Score']}%")
-                    st.success(f"Final Score: {row['Final Score']}%")
-                    st.info(f"Recommendation: {row['Final Decision']}")
+            st.write("I assist with AI-driven hiring insights.")
