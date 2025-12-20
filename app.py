@@ -1,7 +1,8 @@
 import streamlit as st
-import requests
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -18,38 +19,32 @@ body { background-color: #f5f7fa; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- SESSION STATE (LIVE DASHBOARD) ----------------
-if "live_metrics" not in st.session_state:
-    st.session_state.live_metrics = {
-        "evaluations": 0,
-        "scores": [],
-        "hires": 0,
-        "high_risk": 0
-    }
-
-# ---------------- RESUME MATCH LOGIC ----------------
+# ---------------- AI MATCH LOGIC ----------------
 def match_score(jd, resume):
     vectorizer = TfidfVectorizer()
     vectors = vectorizer.fit_transform([jd, resume])
     score = cosine_similarity(vectors)[0][1]
     return round(score * 100, 2)
 
-# ---------------- HUGGING FACE AI CHATBOT (FREE) ----------------
-HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
-HF_HEADERS = {
-    "Authorization": f"Bearer {st.secrets['HF_API_TOKEN']}"
+# ---------------- SEMANTIC CHATBOT (OFFLINE AI) ----------------
+model = SentenceTransformer("all-MiniLM-L6-v2")
+
+INTENTS = {
+    "resume screening": "Resume screening uses NLP to compare resumes with job descriptions and calculate relevance scores.",
+    "interview decision": "Interview decisions combine interviewer feedback, skill alignment, and hiring benchmarks.",
+    "drop-off risk": "Drop-off risk identifies candidates likely to disengage based on communication behavior.",
+    "gcc hiring": "GCC hiring focuses on scalable talent acquisition, operational efficiency, and domain expertise.",
+    "ai hiring": "AI improves hiring by automating screening, scoring candidates, and predicting hiring outcomes."
 }
 
-def ai_chat(prompt):
-    payload = {
-        "inputs": f"You are an AI hiring assistant for Global Capability Centers.\nQuestion: {prompt}"
-    }
-    response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload)
+intent_keys = list(INTENTS.keys())
+intent_embeddings = model.encode(intent_keys)
 
-    if response.status_code == 200:
-        return response.json()[0]["generated_text"]
-    else:
-        return "⚠️ AI service temporarily unavailable"
+def semantic_chat(query):
+    query_embedding = model.encode(query)
+    similarities = np.dot(intent_embeddings, query_embedding)
+    best_index = np.argmax(similarities)
+    return INTENTS[intent_keys[best_index]]
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
@@ -69,16 +64,6 @@ if menu == "Dashboard":
 
     st.success("AI-powered hiring intelligence for Global Capability Centers")
 
-    data = st.session_state.live_metrics
-    avg_score = round(sum(data["scores"]) / len(data["scores"]), 2) if data["scores"] else 0
-
-    st.markdown("### Live Demo Metrics")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Evaluations Done", data["evaluations"])
-    c2.metric("Avg Live Match Score", f"{avg_score}%")
-    c3.metric("Hire Decisions", data["hires"])
-    c4.metric("High Drop-Off Alerts", data["high_risk"])
-
 # ---------------- RESUME SCREENING ----------------
 elif menu == "Resume Screening":
     st.title("Resume Screening")
@@ -90,9 +75,6 @@ elif menu == "Resume Screening":
         if jd and resume:
             score = match_score(jd, resume)
             st.metric("Match Score", f"{score}%")
-
-            st.session_state.live_metrics["evaluations"] += 1
-            st.session_state.live_metrics["scores"].append(score)
         else:
             st.warning("Please enter both Job Description and Resume")
 
@@ -105,7 +87,6 @@ elif menu == "Interview Decision":
     if st.button("Get Decision"):
         if "good" in feedback.lower() or "strong" in feedback.lower():
             st.success("Decision: HIRE")
-            st.session_state.live_metrics["hires"] += 1
         else:
             st.error("Decision: REJECT")
 
@@ -117,18 +98,16 @@ elif menu == "Drop-Off Risk":
 
     if responses < 2:
         st.error("High Drop-Off Risk")
-        st.session_state.live_metrics["high_risk"] += 1
     else:
         st.success("Low Drop-Off Risk")
 
-# ---------------- CHATBOT ----------------
+# ---------------- CHATBOT (SEMANTIC AI) ----------------
 elif menu == "Chatbot":
     st.title("AI Hiring Assistant")
 
-    question = st.text_input("Ask anything about hiring, resumes, or GCC strategy")
+    user_query = st.text_input("Ask anything about hiring, resumes, or GCC strategy")
 
-    if st.button("Ask AI"):
-        if question:
-            with st.spinner("Thinking..."):
-                answer = ai_chat(question)
-                st.write(answer)
+    if st.button("Ask"):
+        if user_query:
+            answer = semantic_chat(user_query)
+            st.write(answer)
