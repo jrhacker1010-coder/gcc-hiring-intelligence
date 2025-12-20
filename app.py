@@ -20,7 +20,7 @@ body { background-color: #f5f7fa; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- LOAD SKILLS DATABASE (10,000+) ----------------
+# ---------------- LOAD SKILLS DATABASE ----------------
 @st.cache_data
 def load_skills_db():
     with open("skills_db.txt", "r", encoding="utf-8") as f:
@@ -44,6 +44,11 @@ def extract_skills(text):
 def extract_jd_skills(jd_text):
     jd_text = jd_text.lower()
     return sorted({skill for skill in SKILLS_DB if skill in jd_text})
+
+def compare_skills(jd_skills, resume_skills):
+    matched = sorted(set(jd_skills) & set(resume_skills))
+    missing = sorted(set(jd_skills) - set(resume_skills))
+    return matched, missing
 
 def extract_experience(text):
     text = text.lower()
@@ -77,10 +82,8 @@ def hiring_decision(score):
     else:
         return "REJECT"
 
-def rejection_reason(score, experience, resume_skills, jd_skills):
+def rejection_reason(score, experience, missing_skills):
     reasons = []
-
-    missing_skills = list(set(jd_skills) - set(resume_skills))
 
     if score < 50:
         reasons.append("Low relevance to the job description")
@@ -137,19 +140,24 @@ elif menu == "Bulk Resume Screening":
                     decision = "REJECT"
                     skills = []
                     exp = 0
+                    matched_skills = []
+                    missing_skills = jd_skills
                 else:
                     score = compute_match_score(jd.lower(), resume_text)
                     decision = hiring_decision(score)
                     skills = extract_skills(resume_text)
                     exp = extract_experience(resume_text)
+                    matched_skills, missing_skills = compare_skills(jd_skills, skills)
 
                 results.append({
                     "Candidate": file.name.replace(".pdf", ""),
                     "Match Score (%)": score,
                     "Decision": decision,
                     "Experience (Years)": exp,
-                    "Skills Found": ", ".join(skills) if skills else "Not detected",
-                    "Rejection Reason": rejection_reason(score, exp, skills, jd_skills)
+                    "JD Required Skills": ", ".join(jd_skills) if jd_skills else "Not detected",
+                    "Matched Skills": ", ".join(matched_skills) if matched_skills else "None",
+                    "Missing Skills": ", ".join(missing_skills) if missing_skills else "None",
+                    "Rejection Reason": rejection_reason(score, exp, missing_skills)
                         if decision == "REJECT" else ""
                 })
 
@@ -165,7 +173,9 @@ elif menu == "Bulk Resume Screening":
                 with st.expander(f"📄 {row['Candidate']} — {row['Decision']}"):
                     st.write(f"**Match Score:** {row['Match Score (%)']}%")
                     st.write(f"**Experience:** {row['Experience (Years)']} years")
-                    st.write(f"**Skills Identified:** {row['Skills Found']}")
+                    st.write(f"**JD Required Skills:** {row['JD Required Skills']}")
+                    st.write(f"**Matched Skills:** {row['Matched Skills']}")
+                    st.write(f"**Missing Skills:** {row['Missing Skills']}")
 
                     if row["Decision"] == "REJECT":
                         st.error(f"❌ Rejection Reason: {row['Rejection Reason']}")
