@@ -136,10 +136,8 @@ elif menu == "Bulk Resume Screening":
                     missing_skills = jd_skills
                 else:
                     base_score = compute_match_score(jd.lower(), resume_text)
-
-                     skill_bonus = min(len(matched_skills) * 5, 20)
-                     score = min(base_score + skill_bonus, 100)
-
+                    skill_bonus = min(len(matched_skills) * 5, 20)
+                    score = min(base_score + skill_bonus, 100)
                     decision = hiring_decision(score)
                     skills = extract_skills(resume_text)
                     exp = extract_experience(resume_text)
@@ -229,6 +227,7 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
 
 
