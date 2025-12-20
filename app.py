@@ -161,7 +161,7 @@ elif menu == "Bulk Resume Screening":
             # 👇 THIS LINE MUST ALIGN WITH results.append
             df = pd.DataFrame(results).sort_values(
                 by="Match Score (%)", ascending=False
-            )
+            })
 
             st.markdown("### 🧠 AI Screening Results")
             st.dataframe(df, use_container_width=True)
@@ -232,6 +232,7 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
 
 
