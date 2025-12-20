@@ -123,6 +123,27 @@ elif menu == "Drop-Off Risk":
     if "responses" in locals() and responses < 2:
         st.session_state.live_metrics["high_risk"] += 1
 
+import requests
+import os
+
+HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+HF_HEADERS = {
+    "Authorization": f"Bearer {st.secrets['HF_API_TOKEN']}"
+}
+
+def ai_chat(prompt):
+    payload = {
+        "inputs": f"You are an AI hiring assistant for Global Capability Centers. Answer clearly.\n\nUser: {prompt}\nAI:"
+    }
+
+    response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload)
+
+    if response.status_code == 200:
+        return response.json()[0]["generated_text"]
+    else:
+        return "⚠️ AI service temporarily unavailable"
+
+
 # ---------- CHATBOT ----------
 elif menu == "Chatbot":
     st.title("AI Hiring Assistant")
@@ -132,13 +153,14 @@ elif menu == "Chatbot":
     if query:
         q = query.lower()
 
-        if "hire" in q:
-            st.write("Hiring decisions are based on AI match score, interview feedback, and engagement risk.")
-        elif "resume" in q:
-            st.write("Resumes are evaluated using NLP similarity with job descriptions.")
-        elif "drop" in q:
-            st.write("Low engagement indicates a high candidate drop-off risk.")
-        elif "gcc" in q:
-            st.write("This platform is tailored for Global Capability Center hiring workflows.")
-        else:
-            st.write("Please ask a GCC hiring-related question.")
+    elif menu == "Chatbot":
+    st.title("AI Hiring Assistant")
+
+    user_query = st.text_input("Ask anything about hiring, resumes, GCC strategy")
+
+    if st.button("Ask AI"):
+        if user_query:
+            with st.spinner("Thinking..."):
+                answer = ai_chat(user_query)
+                st.write(answer)
+   
