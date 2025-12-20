@@ -1,12 +1,12 @@
 import streamlit as st
-import numpy as np
+import re
+import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="GCC Hiring Intelligence Platform",
+    page_title="GCC Hiring & Interview Decision Assistant",
     layout="wide"
 )
 
@@ -16,41 +16,46 @@ st.markdown("""
 body { background-color: #f5f7fa; }
 [data-testid="stSidebar"] { background-color: #0f172a; }
 [data-testid="stSidebar"] * { color: white; }
+pre { background-color: #0f172a; color: #e5e7eb; padding: 15px; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- AI MATCH LOGIC ----------------
-def match_score(jd, resume):
+# ---------------- HELPERS ----------------
+SKILL_LIBRARY = [
+    "python","java","sql","aws","azure","gcp","docker","kubernetes",
+    "machine learning","deep learning","nlp","data analysis","pandas",
+    "numpy","tensorflow","pytorch","react","node","spark","hadoop"
+]
+
+def extract_skills(text):
+    text = text.lower()
+    return sorted(list({skill for skill in SKILL_LIBRARY if skill in text}))
+
+def extract_experience(text):
+    match = re.findall(r"(\d+)\+?\s+years", text.lower())
+    return max(map(int, match)) if match else 0
+
+def extract_education(text):
+    edu = []
+    for degree in ["bachelor","master","phd","b.tech","m.tech","mba"]:
+        if degree in text.lower():
+            edu.append(degree.upper())
+    return edu
+
+def extract_roles(text):
+    lines = text.split("\n")
+    return [line.strip() for line in lines if "engineer" in line.lower() or "developer" in line.lower()]
+
+def compute_match_score(jd, resume):
     vectorizer = TfidfVectorizer()
     vectors = vectorizer.fit_transform([jd, resume])
-    score = cosine_similarity(vectors)[0][1]
-    return round(score * 100, 2)
-
-# ---------------- SEMANTIC CHATBOT (OFFLINE AI) ----------------
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-INTENTS = {
-    "resume screening": "Resume screening uses NLP to compare resumes with job descriptions and calculate relevance scores.",
-    "interview decision": "Interview decisions combine interviewer feedback, skill alignment, and hiring benchmarks.",
-    "drop-off risk": "Drop-off risk identifies candidates likely to disengage based on communication behavior.",
-    "gcc hiring": "GCC hiring focuses on scalable talent acquisition, operational efficiency, and domain expertise.",
-    "ai hiring": "AI improves hiring by automating screening, scoring candidates, and predicting hiring outcomes."
-}
-
-intent_keys = list(INTENTS.keys())
-intent_embeddings = model.encode(intent_keys)
-
-def semantic_chat(query):
-    query_embedding = model.encode(query)
-    similarities = np.dot(intent_embeddings, query_embedding)
-    best_index = np.argmax(similarities)
-    return INTENTS[intent_keys[best_index]]
+    return round(cosine_similarity(vectors)[0][1] * 100, 2)
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
 menu = st.sidebar.radio(
     "Menu",
-    ["Dashboard", "Resume Screening", "Interview Decision", "Drop-Off Risk", "Chatbot"]
+    ["Dashboard", "AI Resume & JD Evaluation"]
 )
 
 # ---------------- DASHBOARD ----------------
@@ -58,56 +63,62 @@ if menu == "Dashboard":
     st.title("Executive Dashboard")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Open Positions", "10")
-    col2.metric("Active Candidates", "65")
-    col3.metric("Avg Match Score", "82%")
+    col1.metric("Use Case", "GCC Hiring")
+    col2.metric("AI Mode", "Offline NLP")
+    col3.metric("Output Format", "JSON Only")
 
-    st.success("AI-powered hiring intelligence for Global Capability Centers")
+    st.success("AI Hiring & Interview Decision Assistant ready for evaluation")
 
-# ---------------- RESUME SCREENING ----------------
-elif menu == "Resume Screening":
-    st.title("Resume Screening")
+# ---------------- MAIN EVALUATION ----------------
+elif menu == "AI Resume & JD Evaluation":
+    st.title("AI Hiring & Interview Decision Assistant")
 
-    jd = st.text_area("Job Description", height=150)
-    resume = st.text_area("Candidate Resume", height=200)
+    jd = st.text_area("📌 Job Description", height=200)
+    resume = st.text_area("📄 Candidate Resume (Extracted Text)", height=250)
 
-    if st.button("Evaluate"):
-        if jd and resume:
-            score = match_score(jd, resume)
-            st.metric("Match Score", f"{score}%")
+    if st.button("Evaluate Candidate"):
+        if not jd or not resume:
+            st.warning("Please provide both Job Description and Resume.")
         else:
-            st.warning("Please enter both Job Description and Resume")
+            # ----- Resume Extraction -----
+            resume_skills = extract_skills(resume)
+            resume_exp = extract_experience(resume)
+            resume_edu = extract_education(resume)
+            resume_roles = extract_roles(resume)
 
-# ---------------- INTERVIEW DECISION ----------------
-elif menu == "Interview Decision":
-    st.title("Interview Evaluation")
+            # ----- JD Extraction -----
+            jd_skills = extract_skills(jd)
+            jd_exp = extract_experience(jd)
 
-    feedback = st.text_area("Interview Feedback")
+            # ----- Comparison -----
+            matching_skills = list(set(resume_skills) & set(jd_skills))
+            missing_skills = list(set(jd_skills) - set(resume_skills))
 
-    if st.button("Get Decision"):
-        if "good" in feedback.lower() or "strong" in feedback.lower():
-            st.success("Decision: HIRE")
-        else:
-            st.error("Decision: REJECT")
+            score = compute_match_score(jd, resume)
 
-# ---------------- DROP-OFF RISK ----------------
-elif menu == "Drop-Off Risk":
-    st.title("Candidate Engagement Risk")
+            if score >= 75:
+                decision = "Strong Match"
+                recommendation = "Candidate meets most technical and experience requirements."
+            elif score >= 50:
+                decision = "Partial Match"
+                recommendation = "Candidate shows potential but lacks some key requirements."
+            else:
+                decision = "Not a Match"
+                recommendation = "Candidate does not sufficiently match role expectations."
 
-    responses = st.slider("Candidate Responses Count", 0, 5, 1)
+            experience_summary = (
+                f"Candidate has approximately {resume_exp} years of experience. "
+                f"Minimum required is {jd_exp} years."
+            )
 
-    if responses < 2:
-        st.error("High Drop-Off Risk")
-    else:
-        st.success("Low Drop-Off Risk")
+            output = {
+                "match_score": score,
+                "decision": decision,
+                "matching_skills": matching_skills,
+                "missing_skills": missing_skills,
+                "experience_summary": experience_summary,
+                "final_recommendation": recommendation
+            }
 
-# ---------------- CHATBOT (SEMANTIC AI) ----------------
-elif menu == "Chatbot":
-    st.title("AI Hiring Assistant")
-
-    user_query = st.text_input("Ask anything about hiring, resumes, or GCC strategy")
-
-    if st.button("Ask"):
-        if user_query:
-            answer = semantic_chat(user_query)
-            st.write(answer)
+            st.markdown("### 🔍 AI Evaluation Output (JSON)")
+            st.code(json.dumps(output, indent=2), language="json")
