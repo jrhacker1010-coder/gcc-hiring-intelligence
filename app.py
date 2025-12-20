@@ -1,12 +1,13 @@
 import streamlit as st
+import pandas as pd
 import re
-import json
+from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="GCC Hiring & Interview Decision Assistant",
+    page_title="GCC AI Hiring Decision Platform",
     layout="wide"
 )
 
@@ -16,109 +17,101 @@ st.markdown("""
 body { background-color: #f5f7fa; }
 [data-testid="stSidebar"] { background-color: #0f172a; }
 [data-testid="stSidebar"] * { color: white; }
-pre { background-color: #0f172a; color: #e5e7eb; padding: 15px; border-radius: 8px; }
+.stDataFrame { background-color: white; }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- HELPERS ----------------
-SKILL_LIBRARY = [
+SKILLS_DB = [
     "python","java","sql","aws","azure","gcp","docker","kubernetes",
-    "machine learning","deep learning","nlp","data analysis","pandas",
-    "numpy","tensorflow","pytorch","react","node","spark","hadoop"
+    "machine learning","deep learning","nlp","data analysis",
+    "pandas","numpy","tensorflow","pytorch","spark","hadoop"
 ]
 
+def extract_text_from_pdf(uploaded_file):
+    reader = PdfReader(uploaded_file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
+    return text.lower()
+
 def extract_skills(text):
-    text = text.lower()
-    return sorted(list({skill for skill in SKILL_LIBRARY if skill in text}))
+    return sorted({skill for skill in SKILLS_DB if skill in text})
 
 def extract_experience(text):
-    match = re.findall(r"(\d+)\+?\s+years", text.lower())
-    return max(map(int, match)) if match else 0
-
-def extract_education(text):
-    edu = []
-    for degree in ["bachelor","master","phd","b.tech","m.tech","mba"]:
-        if degree in text.lower():
-            edu.append(degree.upper())
-    return edu
-
-def extract_roles(text):
-    lines = text.split("\n")
-    return [line.strip() for line in lines if "engineer" in line.lower() or "developer" in line.lower()]
+    matches = re.findall(r"(\\d+)\\+?\\s+years", text)
+    return max(map(int, matches)) if matches else 0
 
 def compute_match_score(jd, resume):
-    vectorizer = TfidfVectorizer()
-    vectors = vectorizer.fit_transform([jd, resume])
+    tfidf = TfidfVectorizer()
+    vectors = tfidf.fit_transform([jd, resume])
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
+
+def hiring_decision(score):
+    if score >= 75:
+        return "HIRE"
+    elif score >= 50:
+        return "REVIEW"
+    else:
+        return "REJECT"
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
-menu = st.sidebar.radio(
-    "Menu",
-    ["Dashboard", "AI Resume & JD Evaluation"]
-)
+menu = st.sidebar.radio("Menu", ["Dashboard", "Bulk Resume Screening"])
 
 # ---------------- DASHBOARD ----------------
 if menu == "Dashboard":
-    st.title("Executive Dashboard")
+    st.title("Executive Hiring Dashboard")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Use Case", "GCC Hiring")
-    col2.metric("AI Mode", "Offline NLP")
-    col3.metric("Output Format", "JSON Only")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Hiring Model", "AI + NLP")
+    c2.metric("Resume Input", "PDF (Bulk)")
+    c3.metric("Decision Output", "Hire / Review / Reject")
 
-    st.success("AI Hiring & Interview Decision Assistant ready for evaluation")
+    st.success("Enterprise-ready GCC Hiring Intelligence System")
 
-# ---------------- MAIN EVALUATION ----------------
-elif menu == "AI Resume & JD Evaluation":
-    st.title("AI Hiring & Interview Decision Assistant")
+# ---------------- BULK RESUME SCREENING ----------------
+elif menu == "Bulk Resume Screening":
+    st.title("📄 Bulk Resume Screening (PDF)")
 
-    jd = st.text_area("📌 Job Description", height=200)
-    resume = st.text_area("📄 Candidate Resume (Extracted Text)", height=250)
+    jd = st.text_area("📌 Job Description", height=180)
 
-    if st.button("Evaluate Candidate"):
-        if not jd or not resume:
-            st.warning("Please provide both Job Description and Resume.")
+    uploaded_files = st.file_uploader(
+        "📤 Upload Candidate Resumes (PDF only)",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
+
+    if st.button("Evaluate Candidates"):
+        if not jd or not uploaded_files:
+            st.warning("Please provide job description and upload resumes.")
         else:
-            # ----- Resume Extraction -----
-            resume_skills = extract_skills(resume)
-            resume_exp = extract_experience(resume)
-            resume_edu = extract_education(resume)
-            resume_roles = extract_roles(resume)
+            results = []
 
-            # ----- JD Extraction -----
-            jd_skills = extract_skills(jd)
-            jd_exp = extract_experience(jd)
+            for file in uploaded_files:
+                resume_text = extract_text_from_pdf(file)
 
-            # ----- Comparison -----
-            matching_skills = list(set(resume_skills) & set(jd_skills))
-            missing_skills = list(set(jd_skills) - set(resume_skills))
+                score = compute_match_score(jd.lower(), resume_text)
+                decision = hiring_decision(score)
 
-            score = compute_match_score(jd, resume)
+                results.append({
+                    "Candidate": file.name.replace(".pdf", ""),
+                    "Match Score (%)": score,
+                    "Decision": decision,
+                    "Skills Found": ", ".join(extract_skills(resume_text)),
+                    "Experience (Years)": extract_experience(resume_text)
+                })
 
-            if score >= 75:
-                decision = "Strong Match"
-                recommendation = "Candidate meets most technical and experience requirements."
-            elif score >= 50:
-                decision = "Partial Match"
-                recommendation = "Candidate shows potential but lacks some key requirements."
-            else:
-                decision = "Not a Match"
-                recommendation = "Candidate does not sufficiently match role expectations."
-
-            experience_summary = (
-                f"Candidate has approximately {resume_exp} years of experience. "
-                f"Minimum required is {jd_exp} years."
+            df = pd.DataFrame(results).sort_values(
+                by="Match Score (%)", ascending=False
             )
 
-            output = {
-                "match_score": score,
-                "decision": decision,
-                "matching_skills": matching_skills,
-                "missing_skills": missing_skills,
-                "experience_summary": experience_summary,
-                "final_recommendation": recommendation
-            }
+            st.markdown("### 🧠 AI Screening Results")
+            st.dataframe(df, use_container_width=True)
 
-            st.markdown("### 🔍 AI Evaluation Output (JSON)")
-            st.code(json.dumps(output, indent=2), language="json")
+            st.markdown("### 🔍 Candidate Details")
+            for _, row in df.iterrows():
+                with st.expander(f"📄 {row['Candidate']} — {row['Decision']}"):
+                    st.write(f"**Match Score:** {row['Match Score (%)']}%")
+                    st.write(f"**Experience:** {row['Experience (Years)']} years")
+                    st.write(f"**Skills Identified:** {row['Skills Found']}")
