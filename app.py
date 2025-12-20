@@ -16,11 +16,19 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-
 st.set_page_config(
     page_title="GCC Hiring Intelligence Platform",
     layout="wide"
 )
+
+# ---------- LIVE DASHBOARD STATE (ADD-ON ONLY) ----------
+if "live_metrics" not in st.session_state:
+    st.session_state.live_metrics = {
+        "evaluations": 0,
+        "scores": [],
+        "hires": 0,
+        "high_risk": 0
+    }
 
 # ---------- AI LOGIC ----------
 def match_score(jd, resume):
@@ -47,6 +55,23 @@ if menu == "Dashboard":
 
     st.success("AI-powered hiring intelligence for Global Capability Centers")
 
+    # ---------- LIVE METRICS (ADD-ON VIEW) ----------
+    data = st.session_state.live_metrics
+
+    avg_score = (
+        round(sum(data["scores"]) / len(data["scores"]), 2)
+        if data["scores"]
+        else 0
+    )
+
+    st.markdown("### Live Demo Metrics")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Evaluations Done", data["evaluations"])
+    c2.metric("Avg Live Match Score", f"{avg_score}%")
+    c3.metric("Live Hire Decisions", data["hires"])
+    c4.metric("High Drop-Off Alerts", data["high_risk"])
+
 # ---------- MODULE 1 ----------
 elif menu == "Resume Screening":
     st.title("Resume Screening")
@@ -61,6 +86,11 @@ elif menu == "Resume Screening":
         else:
             st.warning("Please enter both fields")
 
+    # ---- passive dashboard update (resume screening) ----
+    if "score" in locals():
+        st.session_state.live_metrics["evaluations"] += 1
+        st.session_state.live_metrics["scores"].append(score)
+
 # ---------- MODULE 2 ----------
 elif menu == "Interview Decision":
     st.title("Interview Evaluation")
@@ -73,6 +103,11 @@ elif menu == "Interview Decision":
         else:
             st.error("Decision: REJECT")
 
+    # ---- passive dashboard update (interview decision) ----
+    if "feedback" in locals():
+        if "good" in feedback.lower() or "strong" in feedback.lower():
+            st.session_state.live_metrics["hires"] += 1
+
 # ---------- MODULE 3 ----------
 elif menu == "Drop-Off Risk":
     st.title("Candidate Engagement Risk")
@@ -83,6 +118,10 @@ elif menu == "Drop-Off Risk":
         st.error("High Drop-Off Risk")
     else:
         st.success("Low Drop-Off Risk")
+
+    # ---- passive dashboard update (drop-off risk) ----
+    if "responses" in locals() and responses < 2:
+        st.session_state.live_metrics["high_risk"] += 1
 
 # ---------- CHATBOT ----------
 elif menu == "Chatbot":
@@ -103,5 +142,3 @@ elif menu == "Chatbot":
             st.write("This platform is tailored for Global Capability Center hiring workflows.")
         else:
             st.write("Please ask a GCC hiring-related question.")
-
-
