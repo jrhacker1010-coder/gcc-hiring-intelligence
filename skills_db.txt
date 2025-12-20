@@ -1,0 +1,268 @@
+python
+java
+c
+c++
+c#
+go
+rust
+ruby
+php
+swift
+kotlin
+scala
+typescript
+javascript
+html
+css
+react
+angular
+vue
+nextjs
+nodejs
+expressjs
+nestjs
+spring
+spring boot
+django
+flask
+fastapi
+laravel
+rails
+asp.net
+dotnet
+graphql
+rest api
+soap api
+microservices
+event driven architecture
+distributed systems
+cloud computing
+aws
+azure
+gcp
+oci
+cloud security
+cloud networking
+serverless
+lambda
+ec2
+s3
+vpc
+iam
+kubernetes
+docker
+helm
+openshift
+terraform
+ansible
+chef
+puppet
+linux
+unix
+windows server
+bash scripting
+powershell
+git
+github
+gitlab
+bitbucket
+ci cd
+jenkins
+github actions
+gitlab ci
+azure devops
+devops
+sre
+monitoring
+logging
+prometheus
+grafana
+elk stack
+splunk
+datadog
+new relic
+cybersecurity
+information security
+network security
+application security
+cloud security posture management
+cspm
+siem
+soc
+threat detection
+incident response
+forensics
+penetration testing
+ethical hacking
+vulnerability assessment
+red teaming
+blue teaming
+purple teaming
+firewalls
+ids
+ips
+zero trust
+iam security
+identity governance
+privileged access management
+pam
+nist
+iso 27001
+pci dss
+gdpr
+hipaa
+sox
+risk management
+governance
+compliance
+security operations
+malware analysis
+reverse engineering
+endpoint security
+edr
+xdr
+mobile security
+iot security
+blockchain security
+smart contracts
+cryptography
+encryption
+key management
+kms
+hsm
+data security
+data privacy
+data engineering
+data analytics
+data analysis
+data visualization
+sql
+mysql
+postgresql
+oracle
+sql server
+nosql
+mongodb
+cassandra
+dynamodb
+redis
+neo4j
+snowflake
+bigquery
+redshift
+hadoop
+spark
+kafka
+airflow
+etl
+elt
+data pipelines
+machine learning
+deep learning
+artificial intelligence
+nlp
+computer vision
+transformers
+llm
+prompt engineering
+feature engineering
+model training
+model evaluation
+mlops
+kubeflow
+mlflow
+tensorflow
+pytorch
+scikit learn
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+business intelligence
+power bi
+tableau
+looker
+excel
+product management
+project management
+agile
+scrum
+kanban
+jira
+confluence
+service management
+itil
+incident management
+problem management
+change management
+release management
+enterprise architecture
+solution architecture
+technical architecture
+systems design
+uml
+api design
+performance engineering
+load testing
+jmeter
+k6
+quality assurance
+software testing
+manual testing
+automation testing
+selenium
+cypress
+playwright
+appium
+testng
+bdd
+tdd
+robot framework
+mobile development
+android
+ios
+flutter
+react native
+ui ux design
+figma
+adobe xd
+user research
+accessibility
+a11y
+digital marketing
+seo
+sem
+content marketing
+email marketing
+social media marketing
+growth hacking
+salesforce
+crm
+erp
+sap
+oracle erp
+workday
+peoplesoft
+hrms
+talent management
+recruitment
+hiring
+interviewing
+onboarding
+learning management system
+lms
+corporate training
+soft skills
+communication
+leadership
+problem solving
+critical thinking
+decision making
+stakeholder management
+time management
+conflict resolution
+negotiation
+presentation skills
+technical writing
+documentation
