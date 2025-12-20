@@ -74,7 +74,13 @@ def compute_match_score(jd, resume):
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
 
 def hiring_decision(score):
-    return "HIRE" if score >= 75 else "REVIEW" if score >= 50 else "REJECT"
+    if score >= 70:
+        return "HIRE"
+    elif score >= 40:
+        return "REVIEW"
+    else:
+        return "REJECT"
+
 
 def rejection_reason(score, experience, missing_skills):
     reasons = []
@@ -129,7 +135,11 @@ elif menu == "Bulk Resume Screening":
                     matched_skills = []
                     missing_skills = jd_skills
                 else:
-                    score = compute_match_score(jd.lower(), resume_text)
+                    base_score = compute_match_score(jd.lower(), resume_text)
+
+skill_bonus = min(len(matched_skills) * 5, 20)
+score = min(base_score + skill_bonus, 100)
+
                     decision = hiring_decision(score)
                     skills = extract_skills(resume_text)
                     exp = extract_experience(resume_text)
@@ -147,8 +157,8 @@ elif menu == "Bulk Resume Screening":
                         if decision == "REJECT" else ""
                 })
 
-            df = pd.DataFrame(results).sort_values(
-                by="Match Score (%)", ascending=False
+            df.insert(0, "Rank", range(1, len(df) + 1))
+
             )
 
             st.markdown("### 🧠 AI Screening Results")
@@ -219,4 +229,5 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
