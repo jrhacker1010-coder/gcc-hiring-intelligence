@@ -101,30 +101,70 @@ if menu == "Dashboard":
 
 # ---------------- RESUME SCREENING (UNCHANGED) ----------------
 elif menu == "Bulk Resume Screening":
-    st.title("📄 Bulk Resume Screening")
-    jd = st.text_area("Job Description")
-    uploaded_files = st.file_uploader("Upload Resumes", type=["pdf"], accept_multiple_files=True)
+    st.title("📄 Bulk Resume Screening (PDF Upload)")
+
+    jd = st.text_area("📌 Job Description", height=180)
+
+    uploaded_files = st.file_uploader(
+        "📤 Upload Candidate Resumes (PDF)",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
 
     if st.button("Evaluate Candidates"):
-        results = []
-        jd_skills = extract_jd_skills(jd)
+        if not jd or not uploaded_files:
+            st.warning("Please provide job description and upload resumes.")
+        else:
+            results = []
+            jd_skills = extract_jd_skills(jd)
 
-        for file in uploaded_files:
-            resume_text = extract_text_from_pdf(file)
-            score = compute_match_score(jd.lower(), resume_text)
-            decision = hiring_decision(score)
-            exp = extract_experience(resume_text)
-            matched, missing = compare_skills(jd_skills, extract_skills(resume_text))
+            for file in uploaded_files:
+                resume_text = extract_text_from_pdf(file)
 
-            results.append({
-                "Candidate": file.name.replace(".pdf", ""),
-                "Resume Score": score,
-                "Decision": decision
-            })
+                if not resume_text.strip():
+                    score = 0
+                    decision = "REJECT"
+                    skills = []
+                    exp = 0
+                    matched_skills = []
+                    missing_skills = jd_skills
+                else:
+                    score = compute_match_score(jd.lower(), resume_text)
+                    decision = hiring_decision(score)
+                    skills = extract_skills(resume_text)
+                    exp = extract_experience(resume_text)
+                    matched_skills, missing_skills = compare_skills(jd_skills, skills)
 
-        df = pd.DataFrame(results).sort_values("Resume Score", ascending=False)
-        st.dataframe(df, use_container_width=True)
-        st.session_state.resume_df = df
+                results.append({
+                    "Candidate": file.name.replace(".pdf", ""),
+                    "Match Score (%)": score,
+                    "Decision": decision,
+                    "Experience (Years)": exp,
+                    "JD Required Skills": ", ".join(jd_skills) if jd_skills else "Not detected",
+                    "Matched Skills": ", ".join(matched_skills) if matched_skills else "None",
+                    "Missing Skills": ", ".join(missing_skills) if missing_skills else "None",
+                    "Rejection Reason": rejection_reason(score, exp, missing_skills)
+                        if decision == "REJECT" else ""
+                })
+
+            df = pd.DataFrame(results).sort_values(
+                by="Match Score (%)", ascending=False
+            )
+
+            st.markdown("### 🧠 AI Screening Results")
+            st.dataframe(df, use_container_width=True)
+
+            st.markdown("### 🔍 Candidate Breakdown")
+            for _, row in df.iterrows():
+                with st.expander(f"📄 {row['Candidate']} — {row['Decision']}"):
+                    st.write(f"**Match Score:** {row['Match Score (%)']}%")
+                    st.write(f"**Experience:** {row['Experience (Years)']} years")
+                    st.write(f"**JD Required Skills:** {row['JD Required Skills']}")
+                    st.write(f"**Matched Skills:** {row['Matched Skills']}")
+                    st.write(f"**Missing Skills:** {row['Missing Skills']}")
+
+                    if row["Decision"] == "REJECT":
+                        st.error(f"❌ Rejection Reason: {row['Rejection Reason']}")
 
 # ---------------- INTERVIEW EVALUATION ----------------
 elif menu == "Interview Evaluation":
@@ -179,3 +219,4 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
