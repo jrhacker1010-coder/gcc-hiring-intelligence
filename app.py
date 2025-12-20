@@ -146,6 +146,9 @@ elif menu == "Bulk Resume Screening":
                 results.append({
                     "Candidate": file.name.replace(".pdf", ""),
                     "Match Score (%)": score,
+                                   results.append({
+                    "Candidate Name": name,
+                    "Match Score (%)": score,
                     "Decision": decision,
                     "Experience (Years)": exp,
                     "JD Required Skills": ", ".join(jd_skills) if jd_skills else "Not detected",
@@ -155,18 +158,17 @@ elif menu == "Bulk Resume Screening":
                         if decision == "REJECT" else ""
                 })
 
-            
-               df = pd.DataFrame(results).sort_values(
-                 by="Match Score (%)", ascending=False
-                )
-
-            
+            # 👇 THIS LINE MUST ALIGN WITH results.append
+            df = pd.DataFrame(results).sort_values(
+                by="Match Score (%)", ascending=False
+            )
 
             st.markdown("### 🧠 AI Screening Results")
             st.dataframe(df, use_container_width=True)
 
             st.markdown("### 🔍 Candidate Breakdown")
             for _, row in df.iterrows():
+
                 with st.expander(f"📄 {row['Candidate']} — {row['Decision']}"):
                     st.write(f"**Match Score:** {row['Match Score (%)']}%")
                     st.write(f"**Experience:** {row['Experience (Years)']} years")
@@ -230,6 +232,7 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
 
 
