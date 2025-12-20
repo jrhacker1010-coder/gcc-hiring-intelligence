@@ -51,22 +51,16 @@ def compare_skills(jd_skills, resume_skills):
     return matched, missing
 
 def extract_experience(text):
-    text = text.lower()
     patterns = [
         r"(\d+)\+?\s*years",
         r"(\d+)\s*yrs",
-        r"over\s*(\d+)\s*years",
-        r"(\d+)\s*years of experience",
-        r"experience[:\s]+(\d+)\s*years"
+        r"(\d+)\s*years of experience"
     ]
     years = []
-    for pattern in patterns:
-        matches = re.findall(pattern, text)
-        for match in matches:
-            try:
-                years.append(int(match))
-            except:
-                pass
+    for p in patterns:
+        matches = re.findall(p, text.lower())
+        for m in matches:
+            years.append(int(m))
     return max(years) if years else 0
 
 def compute_match_score(jd, resume):
@@ -74,29 +68,25 @@ def compute_match_score(jd, resume):
     vectors = tfidf.fit_transform([jd, resume])
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
 
-def hiring_decision(score):
+# ---------------- INTERVIEW & ASSESSMENT AI ----------------
+def interview_feedback_score(comm, tech, culture):
+    return round((comm + tech + culture) / 3, 2)
+
+def final_candidate_score(resume, interview, assessment):
+    return round(
+        (resume * 0.5) +
+        (interview * 0.3) +
+        (assessment * 0.2),
+        2
+    )
+
+def final_decision(score):
     if score >= 75:
         return "HIRE"
-    elif score >= 50:
-        return "REVIEW"
+    elif score >= 60:
+        return "HOLD"
     else:
         return "REJECT"
-
-def rejection_reason(score, experience, missing_skills):
-    reasons = []
-
-    if score < 50:
-        reasons.append("Low relevance to the job description")
-
-    if missing_skills:
-        reasons.append(
-            f"Missing required job skills: {', '.join(missing_skills[:5])}"
-        )
-
-    if experience < 2:
-        reasons.append("Experience does not meet job expectations")
-
-    return "; ".join(reasons) if reasons else "Profile does not sufficiently match job requirements"
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
@@ -107,15 +97,15 @@ if menu == "Dashboard":
     st.title("Executive Hiring Dashboard")
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("Resume Input", "Bulk PDF")
-    c2.metric("Evaluation Type", "AI + NLP")
-    c3.metric("Decision Output", "Hire / Review / Reject")
+    c1.metric("Resume Screening", "AI + NLP")
+    c2.metric("Interview Evaluation", "Structured Feedback")
+    c3.metric("Decision Engine", "Explainable AI")
 
-    st.success("Enterprise-ready GCC Hiring Intelligence Platform")
+    st.success("AI-Driven GCC Hiring Intelligence Platform")
 
 # ---------------- BULK SCREENING ----------------
 elif menu == "Bulk Resume Screening":
-    st.title("📄 Bulk Resume Screening (PDF Upload)")
+    st.title("📄 End-to-End Candidate Evaluation")
 
     jd = st.text_area("📌 Job Description", height=180)
 
@@ -125,57 +115,67 @@ elif menu == "Bulk Resume Screening":
         accept_multiple_files=True
     )
 
+    st.markdown("## 🗣️ Interview Feedback (Structured)")
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        communication = st.slider("Communication", 0, 100, 70)
+    with col2:
+        technical = st.slider("Technical Skills", 0, 100, 75)
+    with col3:
+        culture = st.slider("Cultural Fit", 0, 100, 80)
+
+    st.markdown("## 🧪 Assessment Score")
+    assessment = st.slider("Assessment Result", 0, 100, 72)
+
     if st.button("Evaluate Candidates"):
         if not jd or not uploaded_files:
-            st.warning("Please provide job description and upload resumes.")
+            st.warning("Please upload Job Description and Resumes.")
         else:
             results = []
             jd_skills = extract_jd_skills(jd)
 
+            interview_score = interview_feedback_score(
+                communication, technical, culture
+            )
+
             for file in uploaded_files:
                 resume_text = extract_text_from_pdf(file)
 
-                if not resume_text.strip():
-                    score = 0
-                    decision = "REJECT"
-                    skills = []
-                    exp = 0
-                    matched_skills = []
-                    missing_skills = jd_skills
-                else:
-                    score = compute_match_score(jd.lower(), resume_text)
-                    decision = hiring_decision(score)
-                    skills = extract_skills(resume_text)
-                    exp = extract_experience(resume_text)
-                    matched_skills, missing_skills = compare_skills(jd_skills, skills)
+                resume_score = compute_match_score(jd.lower(), resume_text)
+                final_score = final_candidate_score(
+                    resume_score, interview_score, assessment
+                )
+
+                decision = final_decision(final_score)
+
+                skills = extract_skills(resume_text)
+                matched, missing = compare_skills(jd_skills, skills)
+                exp = extract_experience(resume_text)
 
                 results.append({
                     "Candidate": file.name.replace(".pdf", ""),
-                    "Match Score (%)": score,
-                    "Decision": decision,
-                    "Experience (Years)": exp,
-                    "JD Required Skills": ", ".join(jd_skills) if jd_skills else "Not detected",
-                    "Matched Skills": ", ".join(matched_skills) if matched_skills else "None",
-                    "Missing Skills": ", ".join(missing_skills) if missing_skills else "None",
-                    "Rejection Reason": rejection_reason(score, exp, missing_skills)
-                        if decision == "REJECT" else ""
+                    "Resume Score": resume_score,
+                    "Interview Score": interview_score,
+                    "Assessment Score": assessment,
+                    "Final Score": final_score,
+                    "Final Decision": decision,
+                    "Experience": exp,
+                    "Matched Skills": ", ".join(matched),
+                    "Missing Skills": ", ".join(missing)
                 })
 
             df = pd.DataFrame(results).sort_values(
-                by="Match Score (%)", ascending=False
+                by="Final Score", ascending=False
             )
 
-            st.markdown("### 🧠 AI Screening Results")
+            st.markdown("### 🧠 AI Final Decision Scorecard")
             st.dataframe(df, use_container_width=True)
 
-            st.markdown("### 🔍 Candidate Breakdown")
             for _, row in df.iterrows():
-                with st.expander(f"📄 {row['Candidate']} — {row['Decision']}"):
-                    st.write(f"**Match Score:** {row['Match Score (%)']}%")
-                    st.write(f"**Experience:** {row['Experience (Years)']} years")
-                    st.write(f"**JD Required Skills:** {row['JD Required Skills']}")
-                    st.write(f"**Matched Skills:** {row['Matched Skills']}")
-                    st.write(f"**Missing Skills:** {row['Missing Skills']}")
-
-                    if row["Decision"] == "REJECT":
-                        st.error(f"❌ Rejection Reason: {row['Rejection Reason']}")
+                with st.expander(f"📄 {row['Candidate']} — {row['Final Decision']}"):
+                    st.write(f"Resume Score: {row['Resume Score']}%")
+                    st.write(f"Interview Score: {row['Interview Score']}%")
+                    st.write(f"Assessment Score: {row['Assessment Score']}%")
+                    st.success(f"Final Score: {row['Final Score']}%")
+                    st.info(f"Recommendation: {row['Final Decision']}")
