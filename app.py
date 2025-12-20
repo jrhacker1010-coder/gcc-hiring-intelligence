@@ -156,8 +156,8 @@ elif menu == "Bulk Resume Screening":
                 })
 
             
-               df = pd.DataFrame(results).sort_values(
-               by="Match Score (%)", ascending=False
+                 df = pd.DataFrame(results).sort_values(
+                 by="Match Score (%)", ascending=False
                 )
 
             
@@ -230,6 +230,7 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
 
 
 
