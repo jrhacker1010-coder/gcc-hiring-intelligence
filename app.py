@@ -2,6 +2,21 @@ import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+st.markdown("""
+<style>
+body {
+    background-color: #f5f7fa;
+}
+[data-testid="stSidebar"] {
+    background-color: #0f172a;
+}
+[data-testid="stSidebar"] * {
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 st.set_page_config(
     page_title="GCC Hiring Intelligence Platform",
     layout="wide"
@@ -71,14 +86,22 @@ elif menu == "Drop-Off Risk":
 
 # ---------- CHATBOT ----------
 elif menu == "Chatbot":
-    st.title("Hiring Assistant Chatbot")
+    st.title("AI Hiring Assistant")
 
-    query = st.text_input("Ask a question")
+    query = st.text_input("Ask about hiring, candidates, or GCC strategy")
 
     if query:
-        if "top" in query.lower():
-            st.write("Top candidates are ranked based on AI match scores.")
-        elif "drop" in query.lower():
-            st.write("Candidate shows high drop-off risk.")
+        q = query.lower()
+
+        if "hire" in q:
+            st.write("Hiring decisions are based on AI match score, interview feedback, and engagement risk.")
+        elif "resume" in q:
+            st.write("Resumes are evaluated using NLP similarity with job descriptions.")
+        elif "drop" in q:
+            st.write("Low engagement indicates a high candidate drop-off risk.")
+        elif "gcc" in q:
+            st.write("This platform is tailored for Global Capability Center hiring workflows.")
         else:
-            st.write("Please ask a hiring-related question.")
+            st.write("Please ask a GCC hiring-related question.")
+
+
