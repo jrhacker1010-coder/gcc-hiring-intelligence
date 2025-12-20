@@ -18,29 +18,38 @@ body { background-color: #f5f7fa; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- AI MATCH LOGIC ----------------
+# ---------------- SESSION STATE (LIVE DASHBOARD) ----------------
+if "live_metrics" not in st.session_state:
+    st.session_state.live_metrics = {
+        "evaluations": 0,
+        "scores": [],
+        "hires": 0,
+        "high_risk": 0
+    }
+
+# ---------------- RESUME MATCH LOGIC ----------------
 def match_score(jd, resume):
     vectorizer = TfidfVectorizer()
     vectors = vectorizer.fit_transform([jd, resume])
     score = cosine_similarity(vectors)[0][1]
     return round(score * 100, 2)
 
-# ---------------- HUGGING FACE CHATBOT ----------------
-HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+# ---------------- HUGGING FACE AI CHATBOT (FREE) ----------------
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
 HF_HEADERS = {
     "Authorization": f"Bearer {st.secrets['HF_API_TOKEN']}"
 }
 
 def ai_chat(prompt):
     payload = {
-        "inputs": f"You are an AI hiring assistant for Global Capability Centers.\nUser: {prompt}\nAI:"
+        "inputs": f"You are an AI hiring assistant for Global Capability Centers.\nQuestion: {prompt}"
     }
     response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload)
 
     if response.status_code == 200:
         return response.json()[0]["generated_text"]
     else:
-        return "⚠️ AI service unavailable"
+        return "⚠️ AI service temporarily unavailable"
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
@@ -60,6 +69,16 @@ if menu == "Dashboard":
 
     st.success("AI-powered hiring intelligence for Global Capability Centers")
 
+    data = st.session_state.live_metrics
+    avg_score = round(sum(data["scores"]) / len(data["scores"]), 2) if data["scores"] else 0
+
+    st.markdown("### Live Demo Metrics")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Evaluations Done", data["evaluations"])
+    c2.metric("Avg Live Match Score", f"{avg_score}%")
+    c3.metric("Hire Decisions", data["hires"])
+    c4.metric("High Drop-Off Alerts", data["high_risk"])
+
 # ---------------- RESUME SCREENING ----------------
 elif menu == "Resume Screening":
     st.title("Resume Screening")
@@ -71,6 +90,9 @@ elif menu == "Resume Screening":
         if jd and resume:
             score = match_score(jd, resume)
             st.metric("Match Score", f"{score}%")
+
+            st.session_state.live_metrics["evaluations"] += 1
+            st.session_state.live_metrics["scores"].append(score)
         else:
             st.warning("Please enter both Job Description and Resume")
 
@@ -83,6 +105,7 @@ elif menu == "Interview Decision":
     if st.button("Get Decision"):
         if "good" in feedback.lower() or "strong" in feedback.lower():
             st.success("Decision: HIRE")
+            st.session_state.live_metrics["hires"] += 1
         else:
             st.error("Decision: REJECT")
 
@@ -94,6 +117,7 @@ elif menu == "Drop-Off Risk":
 
     if responses < 2:
         st.error("High Drop-Off Risk")
+        st.session_state.live_metrics["high_risk"] += 1
     else:
         st.success("Low Drop-Off Risk")
 
@@ -101,10 +125,10 @@ elif menu == "Drop-Off Risk":
 elif menu == "Chatbot":
     st.title("AI Hiring Assistant")
 
-    user_query = st.text_input("Ask anything about hiring, resumes, or GCC strategy")
+    question = st.text_input("Ask anything about hiring, resumes, or GCC strategy")
 
     if st.button("Ask AI"):
-        if user_query:
+        if question:
             with st.spinner("Thinking..."):
-                answer = ai_chat(user_query)
+                answer = ai_chat(question)
                 st.write(answer)
