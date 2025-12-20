@@ -17,7 +17,6 @@ st.markdown("""
 body { background-color: #f5f7fa; }
 [data-testid="stSidebar"] { background-color: #0f172a; }
 [data-testid="stSidebar"] * { color: white; }
-pre { background-color: #111827; color: #e5e7eb; padding: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -41,9 +40,12 @@ def extract_text_from_pdf(uploaded_file):
 def extract_skills(text):
     return sorted({skill for skill in SKILLS_DB if skill in text})
 
+def extract_jd_skills(jd_text):
+    jd_text = jd_text.lower()
+    return sorted({skill for skill in SKILLS_DB if skill in jd_text})
+
 def extract_experience(text):
     text = text.lower()
-
     patterns = [
         r"(\d+)\+?\s*years",
         r"(\d+)\s*yrs",
@@ -51,9 +53,7 @@ def extract_experience(text):
         r"(\d+)\s*years of experience",
         r"experience[:\s]+(\d+)\s*years"
     ]
-
     years = []
-
     for pattern in patterns:
         matches = re.findall(pattern, text)
         for match in matches:
@@ -61,9 +61,7 @@ def extract_experience(text):
                 years.append(int(match))
             except:
                 pass
-
     return max(years) if years else 0
-
 
 def compute_match_score(jd, resume):
     tfidf = TfidfVectorizer(stop_words="english")
@@ -77,6 +75,24 @@ def hiring_decision(score):
         return "REVIEW"
     else:
         return "REJECT"
+
+def rejection_reason(score, experience, resume_skills, jd_skills):
+    reasons = []
+
+    missing_skills = list(set(jd_skills) - set(resume_skills))
+
+    if score < 50:
+        reasons.append("Low relevance to the job description")
+
+    if missing_skills:
+        reasons.append(
+            f"Missing required job skills: {', '.join(missing_skills[:5])}"
+        )
+
+    if experience < 2:
+        reasons.append("Experience does not meet job expectations")
+
+    return "; ".join(reasons) if reasons else "Profile does not sufficiently match job requirements"
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("GCC Hiring Platform")
@@ -105,20 +121,15 @@ elif menu == "Bulk Resume Screening":
         accept_multiple_files=True
     )
 
-    debug = st.checkbox("Show extracted resume text (debug)", False)
-
     if st.button("Evaluate Candidates"):
         if not jd or not uploaded_files:
             st.warning("Please provide job description and upload resumes.")
         else:
             results = []
+            jd_skills = extract_jd_skills(jd)
 
             for file in uploaded_files:
                 resume_text = extract_text_from_pdf(file)
-
-                if debug:
-                    st.markdown(f"#### 📄 Extracted Text — {file.name}")
-                    st.text(resume_text[:1500])
 
                 if not resume_text.strip():
                     score = 0
@@ -136,7 +147,9 @@ elif menu == "Bulk Resume Screening":
                     "Match Score (%)": score,
                     "Decision": decision,
                     "Experience (Years)": exp,
-                    "Skills Found": ", ".join(skills) if skills else "Not detected"
+                    "Skills Found": ", ".join(skills) if skills else "Not detected",
+                    "Rejection Reason": rejection_reason(score, exp, skills, jd_skills)
+                        if decision == "REJECT" else ""
                 })
 
             df = pd.DataFrame(results).sort_values(
@@ -153,3 +166,5 @@ elif menu == "Bulk Resume Screening":
                     st.write(f"**Experience:** {row['Experience (Years)']} years")
                     st.write(f"**Skills Identified:** {row['Skills Found']}")
 
+                    if row["Decision"] == "REJECT":
+                        st.error(f"❌ Rejection Reason: {row['Rejection Reason']}")
