@@ -42,8 +42,28 @@ def extract_skills(text):
     return sorted({skill for skill in SKILLS_DB if skill in text})
 
 def extract_experience(text):
-    matches = re.findall(r"(\\d+)\\+?\\s+years", text)
-    return max(map(int, matches)) if matches else 0
+    text = text.lower()
+
+    patterns = [
+        r"(\d+)\+?\s*years",
+        r"(\d+)\s*yrs",
+        r"over\s*(\d+)\s*years",
+        r"(\d+)\s*years of experience",
+        r"experience[:\s]+(\d+)\s*years"
+    ]
+
+    years = []
+
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            try:
+                years.append(int(match))
+            except:
+                pass
+
+    return max(years) if years else 0
+
 
 def compute_match_score(jd, resume):
     tfidf = TfidfVectorizer(stop_words="english")
@@ -132,3 +152,4 @@ elif menu == "Bulk Resume Screening":
                     st.write(f"**Match Score:** {row['Match Score (%)']}%")
                     st.write(f"**Experience:** {row['Experience (Years)']} years")
                     st.write(f"**Skills Identified:** {row['Skills Found']}")
+
