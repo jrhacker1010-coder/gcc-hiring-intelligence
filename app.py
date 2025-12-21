@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import json
 
 # Page config
 st.set_page_config(
@@ -21,12 +18,6 @@ st.markdown("""
         font-weight: bold;
         color: #4F46E5;
         margin-bottom: 0.5rem;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        color: white;
     }
     .alert-high {
         background-color: #FEE2E2;
@@ -49,6 +40,41 @@ st.markdown("""
         border-radius: 5px;
         margin: 0.5rem 0;
     }
+    .candidate-card {
+        border: 2px solid #E5E7EB;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        background: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .skill-badge {
+        background-color: #EEF2FF;
+        color: #4338CA;
+        padding: 0.3rem 0.6rem;
+        border-radius: 0.4rem;
+        margin-right: 0.4rem;
+        font-size: 0.85rem;
+        display: inline-block;
+        margin-bottom: 0.3rem;
+    }
+    .progress-bar {
+        background-color: #E5E7EB;
+        border-radius: 10px;
+        height: 20px;
+        overflow: hidden;
+        margin: 0.5rem 0;
+    }
+    .progress-fill {
+        background: linear-gradient(90deg, #4F46E5 0%, #7C3AED 100%);
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -59,6 +85,7 @@ if 'chat_history' not in st.session_state:
     ]
 
 # Mock data
+@st.cache_data
 def load_mock_data():
     candidates = pd.DataFrame({
         'name': ['Priya Sharma', 'Rahul Kumar', 'Ananya Iyer', 'Arjun Patel', 'Meera Joshi', 
@@ -109,11 +136,11 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Quick Actions**")
     if st.button("📤 Upload Resumes", use_container_width=True):
-        st.info("Resume upload feature")
+        st.success("✅ Resume upload ready!")
     if st.button("📧 Send Bulk Email", use_container_width=True):
-        st.info("Email feature")
+        st.success("✅ Email composer opened!")
     if st.button("📈 Generate Report", use_container_width=True):
-        st.info("Report generation")
+        st.success("✅ Report generated!")
 
 # Main content
 st.markdown("<div class='main-header'>🧠 GCC Hiring Intelligence Platform</div>", unsafe_allow_html=True)
@@ -134,31 +161,56 @@ if page == "📊 Dashboard":
     with col4:
         st.metric("Offers", "12", "↑ 3")
     with col5:
-        st.metric("Avg Time to Hire", "18 days", "↓ 2 days")
+        st.metric("Avg Time", "18 days", "↓ 2")
     with col6:
-        st.metric("Drop-off Rate", "12%", "↓ 3%")
+        st.metric("Drop-off", "12%", "↓ 3%")
     
     st.markdown("---")
     
-    # Charts Row
+    # Visual Funnel
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("#### 📈 Hiring Funnel")
-        funnel_data = pd.DataFrame({
-            'Stage': ['Applied', 'Screened', 'Interviewed', 'Offered', 'Joined'],
-            'Count': [247, 189, 45, 12, 10]
-        })
-        fig = px.funnel(funnel_data, x='Count', y='Stage', color='Stage')
-        fig.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        funnel_data = [
+            ("Applied", 247),
+            ("Screened", 189),
+            ("Interviewed", 45),
+            ("Offered", 12),
+            ("Joined", 10)
+        ]
+        
+        for stage, count in funnel_data:
+            percentage = (count / 247) * 100
+            st.markdown(f"**{stage}**: {count} candidates")
+            st.markdown(f"""
+            <div class='progress-bar'>
+                <div class='progress-fill' style='width: {percentage}%'>{percentage:.0f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("#### 🎯 Candidate Status Distribution")
+        st.markdown("#### 🎯 Status Distribution")
         status_counts = candidates_df['status'].value_counts()
-        fig = px.pie(values=status_counts.values, names=status_counts.index, hole=0.4)
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        total = len(candidates_df)
+        
+        colors = {
+            "Interview Scheduled": "#4F46E5",
+            "Technical Round": "#7C3AED",
+            "Offer Extended": "#10B981",
+            "Resume Screened": "#F59E0B"
+        }
+        
+        for status, count in status_counts.items():
+            percentage = (count / total) * 100
+            color = colors.get(status, "#6B7280")
+            
+            st.markdown(f"**{status}**: {count} ({percentage:.0f}%)")
+            st.markdown(f"""
+            <div class='progress-bar'>
+                <div class='progress-fill' style='width: {percentage}%; background: {color}'>{count}</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -200,6 +252,24 @@ if page == "📊 Dashboard":
         st.success("**Hiring Efficiency**\n- Time-to-hire improved by 15% this month\n- 78% of candidates prefer hybrid roles\n- Best source: LinkedIn (45% conversion)")
         
         st.warning("**Predictions**\n- Expected 18 offers this month (vs 12 actual)\n- 3 candidates likely to decline offers\n- Recommend salary adjustment for DevOps roles")
+    
+    # Top Candidates
+    st.markdown("---")
+    st.markdown("#### 🌟 Top Candidates This Week")
+    
+    top_candidates = candidates_df.nlargest(3, 'score')
+    cols = st.columns(3)
+    
+    for idx, (_, candidate) in enumerate(top_candidates.iterrows()):
+        with cols[idx]:
+            st.markdown(f"""
+            <div class='candidate-card'>
+                <h3 style='color: #4F46E5; margin-bottom: 0.5rem;'>{candidate['name']}</h3>
+                <p style='color: #6B7280; margin-bottom: 1rem;'>{candidate['role']}</p>
+                <div style='font-size: 2rem; font-weight: bold; color: #4F46E5; margin-bottom: 0.5rem;'>{candidate['score']}%</div>
+                <p style='font-size: 0.85rem; color: #6B7280;'>Match Score</p>
+            </div>
+            """, unsafe_allow_html=True)
 
 # AI Screening Page
 elif page == "🔍 AI Screening":
@@ -213,14 +283,15 @@ elif page == "🔍 AI Screening":
             accept_multiple_files=True
         )
         
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3 = st.columns([2, 1, 2])
         with col2:
             if st.button("🚀 Start AI Screening", type="primary", use_container_width=True):
                 if uploaded_files:
                     with st.spinner("AI is analyzing resumes..."):
                         import time
                         time.sleep(2)
-                    st.success(f"✅ Screened {len(uploaded_files)} resumes successfully!")
+                    st.success(f"✅ Screened {len(uploaded_files)} resumes!")
+                    st.balloons()
     
     st.markdown("---")
     
@@ -244,27 +315,30 @@ elif page == "🔍 AI Screening":
     
     # Display candidates
     for idx, row in filtered_df.iterrows():
-        with st.container():
-            col1, col2, col3 = st.columns([3, 1, 1])
+        col1, col2, col3 = st.columns([3, 1, 1])
+        
+        with col1:
+            st.markdown(f"#### {row['name']}")
+            st.caption(f"{row['role']} • {row['experience']}")
             
-            with col1:
-                st.markdown(f"**{row['name']}**")
-                st.caption(f"{row['role']} • {row['experience']}")
-                
-                # Skills badges
-                skills = row['skills'].split(', ')
-                skills_html = ' '.join([f"<span style='background-color: #E0E7FF; color: #4338CA; padding: 0.2rem 0.5rem; border-radius: 0.3rem; margin-right: 0.3rem; font-size: 0.8rem;'>{skill}</span>" for skill in skills[:4]])
-                st.markdown(skills_html, unsafe_allow_html=True)
+            skills = row['skills'].split(', ')
+            skills_html = ''.join([f"<span class='skill-badge'>{skill}</span>" for skill in skills[:5]])
+            st.markdown(skills_html, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"<div style='text-align: center;'><div style='font-size: 2rem; font-weight: bold; color: #4F46E5;'>{row['score']}%</div><div style='font-size: 0.85rem; color: #6B7280;'>Match Score</div></div>", unsafe_allow_html=True)
+        
+        with col3:
+            risk_color = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+            st.markdown(f"**Risk:** {risk_color[row['risk']]} {row['risk'].upper()}")
             
-            with col2:
-                st.metric("Match Score", f"{row['score']}%")
-                st.caption(f"Status: {row['status']}")
-            
-            with col3:
-                risk_color = {"low": "🟢", "medium": "🟡", "high": "🔴"}
-                st.markdown(f"**Risk:** {risk_color[row['risk']]} {row['risk'].upper()}")
-                if st.button("View Full Profile", key=f"view_{idx}", use_container_width=True):
-                    st.info(f"Opening profile for {row['name']}")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("👁️ View", key=f"view_{idx}", use_container_width=True):
+                    st.info(f"Profile: {row['name']}")
+            with col_b:
+                if st.button("✉️ Email", key=f"contact_{idx}", use_container_width=True):
+                    st.success(f"Sent to {row['name']}")
         
         st.markdown("---")
 
@@ -285,23 +359,25 @@ elif page == "📅 Interviews":
         ]
         
         for interview in interviews:
-            with st.container():
-                st.markdown(f"""
-                <div style='background-color: #EEF2FF; border-left: 4px solid #4F46E5; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;'>
-                    <strong style='font-size: 1.1rem;'>{interview['name']}</strong><br>
-                    <span style='color: #6B7280;'>{interview['role']}</span><br>
-                    <span style='color: #4F46E5; font-weight: 500;'>⏰ {interview['time']}</span><br>
-                    <span style='font-size: 0.85rem; color: #6B7280;'>Interviewer: {interview['interviewer']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.button("Join Call", key=f"join_{interview['name']}", use_container_width=True)
-                with col_b:
-                    st.button("Reschedule", key=f"reschedule_{interview['name']}", use_container_width=True)
-                with col_c:
-                    st.button("Cancel", key=f"cancel_{interview['name']}", use_container_width=True)
+            st.markdown(f"""
+            <div style='background-color: #EEF2FF; border-left: 4px solid #4F46E5; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;'>
+                <strong style='font-size: 1.1rem;'>{interview['name']}</strong><br>
+                <span style='color: #6B7280;'>{interview['role']}</span><br>
+                <span style='color: #4F46E5; font-weight: 500;'>⏰ {interview['time']}</span><br>
+                <span style='font-size: 0.85rem; color: #6B7280;'>Interviewer: {interview['interviewer']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                if st.button("🎥 Join", key=f"join_{interview['name']}", use_container_width=True):
+                    st.success("Opening call...")
+            with col_b:
+                if st.button("📅", key=f"reschedule_{interview['name']}", use_container_width=True):
+                    st.info("Rescheduling...")
+            with col_c:
+                if st.button("❌", key=f"cancel_{interview['name']}", use_container_width=True):
+                    st.warning("Cancelled")
     
     with col2:
         st.markdown("#### ⏳ Feedback Pending")
@@ -313,26 +389,25 @@ elif page == "📅 Interviews":
         ]
         
         for item in pending:
-            with st.container():
-                st.markdown(f"""
-                <div style='background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;'>
-                    <strong style='font-size: 1.1rem;'>{item['name']}</strong><br>
-                    <span style='color: #6B7280;'>{item['role']}</span><br>
-                    <span style='color: #D97706; font-weight: 500;'>📅 Interviewed: {item['date']}</span><br>
-                    <span style='font-size: 0.85rem; color: #92400E;'>{item['status']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button("Send Reminder", key=f"remind_{item['name']}", use_container_width=True):
-                    st.success(f"Reminder sent to interviewer!")
+            st.markdown(f"""
+            <div style='background-color: #FEF3C7; border-left: 4px solid #F59E0B; padding: 1rem; border-radius: 5px; margin-bottom: 1rem;'>
+                <strong style='font-size: 1.1rem;'>{item['name']}</strong><br>
+                <span style='color: #6B7280;'>{item['role']}</span><br>
+                <span style='color: #D97706; font-weight: 500;'>📅 {item['date']}</span><br>
+                <span style='font-size: 0.85rem; color: #92400E;'>{item['status']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            if st.button("📧 Remind", key=f"remind_{item['name']}", use_container_width=True):
+                st.success("✅ Reminder sent!")
         
         st.markdown("---")
-        st.markdown("#### 🤖 Auto-Schedule Next Batch")
-        if st.button("Schedule 5 Interviews", type="primary", use_container_width=True):
-            with st.spinner("AI is finding optimal time slots..."):
+        st.markdown("#### 🤖 Auto-Schedule")
+        if st.button("📅 Schedule 5 Interviews", type="primary", use_container_width=True):
+            with st.spinner("Finding slots..."):
                 import time
                 time.sleep(1.5)
-            st.success("✅ Scheduled 5 interviews for next week!")
+            st.success("✅ 5 interviews scheduled!")
 
 # Candidates Page
 elif page == "👥 Candidates":
@@ -341,7 +416,7 @@ elif page == "👥 Candidates":
     # Search and filters
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        search = st.text_input("🔍 Search candidates", placeholder="Name, role, or skills...")
+        search = st.text_input("🔍 Search", placeholder="Name, role, or skills...")
     with col2:
         risk_filter = st.selectbox("Risk Level", ["All", "Low", "Medium", "High"])
     with col3:
@@ -367,140 +442,76 @@ elif page == "👥 Candidates":
     elif sort_by == "Name":
         display_df = display_df.sort_values('name')
     
-    # Style the dataframe
-    def color_risk(val):
-        colors = {'low': '#D1FAE5', 'medium': '#FEF3C7', 'high': '#FEE2E2'}
-        return f'background-color: {colors.get(val, "white")}'
+    # Display as cards
+    for idx, row in display_df.iterrows():
+        st.markdown(f"""
+        <div class='candidate-card'>
+            <div style='display: flex; justify-content: space-between; align-items: start;'>
+                <div>
+                    <h3 style='color: #1F2937; margin-bottom: 0.3rem;'>{row['name']}</h3>
+                    <p style='color: #6B7280; margin-bottom: 0.5rem;'>{row['role']}</p>
+                </div>
+                <div style='text-align: right;'>
+                    <div style='font-size: 1.5rem; font-weight: bold; color: #4F46E5;'>{row['score']}%</div>
+                    <div style='font-size: 0.75rem; color: #6B7280;'>Match</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col_a, col_b, col_c, col_d = st.columns(4)
+        with col_a:
+            st.caption(f"**Status:** {row['status']}")
+        with col_b:
+            risk_emoji = {"low": "🟢", "medium": "🟡", "high": "🔴"}
+            st.caption(f"**Risk:** {risk_emoji[row['risk']]} {row['risk'].title()}")
+        with col_c:
+            st.caption(f"**Engagement:** {row['engagement_score']}%")
+        with col_d:
+            if st.button("Details", key=f"details_{idx}", use_container_width=True):
+                st.info(f"Opening {row['name']}")
     
-    styled_df = display_df[['name', 'role', 'score', 'status', 'risk', 'engagement_score']].style.applymap(
-        color_risk, subset=['risk']
-    )
-    
-    st.dataframe(
-        styled_df,
-        column_config={
-            "name": "Candidate Name",
-            "role": "Role",
-            "score": st.column_config.ProgressColumn(
-                "Match Score",
-                format="%d%%",
-                min_value=0,
-                max_value=100,
-            ),
-            "status": "Current Status",
-            "risk": "Drop-off Risk",
-            "engagement_score": st.column_config.ProgressColumn(
-                "Engagement",
-                format="%d%%",
-                min_value=0,
-                max_value=100,
-            ),
-        },
-        hide_index=True,
-        use_container_width=True
-    )
-    
-    # Download options
+    # Download
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
         csv = display_df.to_csv(index=False)
-        st.download_button(
-            "📥 Download as CSV",
-            csv,
-            "candidates.csv",
-            "text/csv",
-            use_container_width=True
-        )
+        st.download_button("📥 CSV", csv, "candidates.csv", "text/csv", use_container_width=True)
     with col2:
-        if st.button("📧 Email Selected", use_container_width=True):
-            st.info("Bulk email feature")
+        if st.button("📧 Email", use_container_width=True):
+            st.success("✅ Opened!")
     with col3:
-        if st.button("📊 Generate Report", use_container_width=True):
-            st.info("Report generation")
+        if st.button("📊 Report", use_container_width=True):
+            st.success("✅ Generated!")
 
 # AI Assistant Page
-else:  # AI Assistant
+else:
     st.markdown("### 💬 AI Hiring Assistant")
-    st.caption("Ask me about candidates, scheduling, analytics, or hiring insights")
+    st.caption("Ask about candidates, scheduling, analytics, or insights")
     
-    # Chat container
-    chat_container = st.container()
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
     
-    with chat_container:
-        for message in st.session_state.chat_history:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
-    
-    # Chat input
-    if prompt := st.chat_input("Ask me anything about hiring..."):
-        # Add user message
+    if prompt := st.chat_input("Ask me anything..."):
         st.session_state.chat_history.append({"role": "user", "content": prompt})
         
-        # Generate response
         prompt_lower = prompt.lower()
         
         if any(word in prompt_lower for word in ['screen', 'resume', 'candidate']):
-            response = "📊 I've analyzed 247 resumes this week. Top candidates:\n\n" \
-                      "• **Priya Sharma** (92% match) - Senior Software Engineer\n" \
-                      "• **Sneha Reddy** (90% match) - ML Engineer\n" \
-                      "• **Rahul Kumar** (88% match) - Data Scientist\n\n" \
-                      "Would you like detailed screening reports for any of these?"
+            response = "📊 Top candidates this week:\n\n• **Priya Sharma** (92%) - Senior SWE\n• **Sneha Reddy** (90%) - ML Engineer\n• **Rahul Kumar** (88%) - Data Scientist\n\nNeed detailed reports?"
         
-        elif any(word in prompt_lower for word in ['schedule', 'interview', 'meeting']):
-            response = "📅 You have 8 interviews scheduled this week:\n\n" \
-                      "**Today:**\n" \
-                      "• Priya Sharma (Senior SWE) - 2:00 PM with Vikram Singh\n\n" \
-                      "**Tomorrow:**\n" \
-                      "• Rahul Kumar (Data Scientist) - 10:00 AM with Sneha Reddy\n\n" \
-                      "I can auto-schedule the next batch if you approve the shortlist."
+        elif any(word in prompt_lower for word in ['schedule', 'interview']):
+            response = "📅 8 interviews scheduled:\n\n**Today:**\n• Priya Sharma - 2:00 PM\n\n**Tomorrow:**\n• Rahul Kumar - 10:00 AM\n\nWant me to auto-schedule more?"
         
-        elif any(word in prompt_lower for word in ['offer', 'drop', 'risk', 'engagement']):
-            response = "⚠️ **High-Priority Alert:**\n\n" \
-                      "**Ananya Iyer** (DevOps Engineer) shows 68% engagement score - HIGH risk of offer drop-off.\n\n" \
-                      "**Indicators:**\n" \
-                      "• Reduced response time\n" \
-                      "• Competitor offer suspected\n" \
-                      "• LinkedIn activity increased\n\n" \
-                      "**Recommendations:**\n" \
-                      "1. Expedite final decision (within 48 hours)\n" \
-                      "2. Personalized outreach from hiring manager\n" \
-                      "3. Consider salary adjustment (+8-12%)"
+        elif any(word in prompt_lower for word in ['offer', 'drop', 'risk']):
+            response = "⚠️ **Alert:**\n\n**Ananya Iyer** - 68% engagement (HIGH risk)\n\n**Actions:**\n1. Expedite decision (48h)\n2. Personalized outreach\n3. Consider +8-12% adjustment"
         
-        elif any(word in prompt_lower for word in ['insight', 'analytics', 'trend', 'data']):
-            response = "📈 **Key Hiring Insights:**\n\n" \
-                      "**Performance Metrics:**\n" \
-                      "• Average time-to-hire: 18 days (↓15% from last month)\n" \
-                      "• Offer acceptance rate: 88%\n" \
-                      "• Quality of hire score: 85%\n\n" \
-                      "**Trends:**\n" \
-                      "• Python skills are in highest demand (87 candidates)\n" \
-                      "• 78% of candidates prefer hybrid roles\n" \
-                      "• LinkedIn is the best source (45% conversion)\n\n" \
-                      "**Predictions:**\n" \
-                      "• Expected 18 offers this month\n" \
-                      "• DevOps roles need salary adjustment"
-        
-        elif any(word in prompt_lower for word in ['skill', 'python', 'aws', 'react']):
-            response = "🎯 **Top Skills Analysis:**\n\n" \
-                      "**Most In-Demand:**\n" \
-                      "1. Python - 87 candidates (65% match rate)\n" \
-                      "2. AWS - 65 candidates (58% match rate)\n" \
-                      "3. React - 52 candidates (71% match rate)\n" \
-                      "4. Machine Learning - 48 candidates (55% match rate)\n\n" \
-                      "**Skill Gaps:**\n" \
-                      "• Kubernetes expertise is rare\n" \
-                      "• Senior DevOps roles hardest to fill\n\n" \
-                      "Would you like to see candidates with specific skills?"
+        elif any(word in prompt_lower for word in ['insight', 'analytics']):
+            response = "📈 **Insights:**\n\n• Time-to-hire: 18 days (↓15%)\n• Acceptance rate: 88%\n• Python most in-demand\n• 78% prefer hybrid\n• LinkedIn best source"
         
         else:
-            response = "I can help you with:\n\n" \
-                      "• 🔍 **Resume screening** - Find top candidates by skills\n" \
-                      "• 📅 **Interview scheduling** - Manage your calendar\n" \
-                      "• 📊 **Candidate analytics** - Track pipeline health\n" \
-                      "• ⚠️ **Risk prediction** - Identify offer drop-off risks\n" \
-                      "• 📈 **Hiring insights** - Data-driven recommendations\n\n" \
-                      "What would you like to explore?"
+            response = "I can help with:\n\n🔍 Resume screening\n📅 Interview scheduling\n📊 Analytics\n⚠️ Risk prediction\n\nWhat would you like?"
         
         st.session_state.chat_history.append({"role": "assistant", "content": response})
         st.rerun()
@@ -509,8 +520,7 @@ else:  # AI Assistant
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #6B7280; font-size: 0.9rem;'>"
-    "🧠 GCC Hiring Intelligence Platform | Built for GCC X Shift Hackathon 2025 | "
-    "<strong>Multi-Tenant • AI-Powered • Scalable</strong>"
+    "🧠 GCC Hiring Intelligence Platform | Hackathon 2025"
     "</div>",
     unsafe_allow_html=True
 )
