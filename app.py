@@ -102,7 +102,7 @@ if menu == "Bulk Resume Screening":
         accept_multiple_files=True
     )
 
-   if st.button("Evaluate Candidates"):
+if st.button("Evaluate Candidates"):
     if not jd or not uploaded_files:
         st.warning("Please provide job description and upload resumes.")
     else:
@@ -196,6 +196,7 @@ for _, row in df.iterrows():
         st.write(f"**Matched Skills:** {row['Matched Skills']}")
         st.write(f"**Missing Skills:** {row['Missing Skills']}")
         st.info(row["AI Evaluation"])
+
 
 
 
