@@ -145,7 +145,7 @@ if menu == "Bulk Resume Screening":
                 by="Match Score (%)",
                 ascending=False
             ).reset_index(drop=True)
-               st.session_state["screening_df"] = df
+        st.session_state["screening_df"] = df
 
            df["Rank"] = df.index + 1
 # ---------------- SHORTLISTING (TOP-N) ----------------
@@ -187,6 +187,7 @@ for _, row in df.iterrows():
         st.write(f"**Matched Skills:** {row['Matched Skills']}")
         st.write(f"**Missing Skills:** {row['Missing Skills']}")
         st.info(row["AI Evaluation"])
+
 
 
 
