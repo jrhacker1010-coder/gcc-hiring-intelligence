@@ -58,10 +58,25 @@ def extract_experience(text):
     matches = re.findall(r"(\d+)\+?\s*(years|yrs)", text.lower())
     return max([int(m[0]) for m in matches], default=0)
 
-def compute_match_score(jd, resume):
+def compute_text_similarity(jd, resume):
     tfidf = TfidfVectorizer(stop_words="english")
     vectors = tfidf.fit_transform([jd, resume])
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
+
+def skill_match_score(jd_skills, resume_skills):
+    if not jd_skills:
+        return 0
+    return round((len(set(jd_skills) & set(resume_skills)) / len(jd_skills)) * 100, 2)
+
+def experience_score(exp):
+    if exp >= 5:
+        return 100
+    elif exp >= 3:
+        return 75
+    elif exp >= 1:
+        return 50
+    else:
+        return 25
 
 def ai_evaluation(jd, resume, score, matched, missing, exp):
     prompt = f"""
@@ -71,7 +86,7 @@ Job Description:
 Resume:
 {resume[:1500]}
 
-Match Score: {score}
+Resume Score: {score}
 Experience: {exp}
 Matched Skills: {matched}
 Missing Skills: {missing}
@@ -98,21 +113,31 @@ if st.button("🚀 Evaluate Candidates"):
         st.warning("Please provide JD and resumes")
     else:
         rows = []
+        jd_skills = extract_jd_skills(jd)
 
         for f in files:
             text = extract_text_from_pdf(f)
-            score = compute_match_score(jd, text)
-            skills = extract_skills(text)
-            jd_skills = extract_jd_skills(jd)
-            exp = extract_experience(text)
-            missing = list(set(jd_skills) - set(skills))
 
-            ai = ai_evaluation(jd, text, score, skills, missing, exp)
+            text_score = compute_text_similarity(jd, text)
+            skills = extract_skills(text)
+            exp = extract_experience(text)
+            skill_score = skill_match_score(jd_skills, skills)
+            exp_score = experience_score(exp)
+
+            resume_score = round(
+                text_score * 0.5 +
+                skill_score * 0.3 +
+                exp_score * 0.2,
+                2
+            )
+
+            missing = list(set(jd_skills) - set(skills))
+            ai = ai_evaluation(jd, text, resume_score, skills, missing, exp)
             decision = "HIRE" if "HIRE" in ai else "REVIEW" if "REVIEW" in ai else "REJECT"
 
             rows.append({
                 "Candidate": f.name.replace(".pdf", ""),
-                "Match Score (%)": score,
+                "Resume Score (%)": resume_score,
                 "AI Decision": decision,
                 "Experience": exp,
                 "Matched Skills": ", ".join(skills),
@@ -120,80 +145,41 @@ if st.button("🚀 Evaluate Candidates"):
                 "AI Reason": ai
             })
 
-        df = pd.DataFrame(rows).sort_values("Match Score (%)", ascending=False).reset_index(drop=True)
+        df = pd.DataFrame(rows).sort_values("Resume Score (%)", ascending=False).reset_index(drop=True)
         df["Rank"] = df.index + 1
         st.session_state.screening_df = df
         st.success("✅ Screening completed")
 
-# =====================================================
-# EVERYTHING BELOW IS SAFE (df EXISTS)
-# =====================================================
+# ---------------- INTERVIEW & FINAL ----------------
 if "screening_df" in st.session_state:
     df = st.session_state.screening_df
-
-    st.markdown("## 🧠 Screening Results")
     st.dataframe(df, hide_index=True)
-
-    # ---------------- INTERVIEW ----------------
-    st.markdown("## 🎤 Interview Evaluation")
 
     candidate = st.selectbox("Select Candidate", df["Candidate"].tolist())
 
-    c1, c2 = st.columns(2)
-    with c1:
-        tech = st.slider("Technical", 1, 5)
-        comm = st.slider("Communication", 1, 5)
-    with c2:
-        prob = st.slider("Problem Solving", 1, 5)
-        culture = st.slider("Cultural Fit", 1, 5)
+    tech = st.slider("Technical", 1, 5)
+    comm = st.slider("Communication", 1, 5)
+    prob = st.slider("Problem Solving", 1, 5)
+    culture = st.slider("Cultural Fit", 1, 5)
 
     interview_score = round((tech*0.4 + comm*0.25 + prob*0.25 + culture*0.1)*20, 2)
-    st.metric("Interview Score", interview_score)
 
     if st.button("Save Interview Score"):
         st.session_state.interview_scores[candidate] = interview_score
-        st.success("Interview score saved")
-
-    # ---------------- FINAL TABLE ----------------
-    st.markdown("## 📊 Final Hiring Table")
 
     final = []
     for _, r in df.iterrows():
         i = st.session_state.interview_scores.get(r["Candidate"], 0)
+        final_score = round(r["Resume Score (%)"] * 0.5 + i * 0.5, 2)
+
         final.append({
             "Candidate": r["Candidate"],
-            "Resume Score": r["Match Score (%)"],
+            "Resume Score": r["Resume Score (%)"],
             "Interview Score": i,
-            "Final Score": round(r["Match Score (%)"]*0.6 + i*0.4, 2),
+            "Final Score": final_score,
             "Human Decision": st.session_state.final_decisions.get(r["Candidate"], "PENDING")
         })
 
     final_df = pd.DataFrame(final).sort_values("Final Score", ascending=False)
     final_df["Final Rank"] = range(1, len(final_df)+1)
     st.dataframe(final_df, hide_index=True)
-
-    # ---------------- HUMAN DECISION ----------------
-    st.markdown("## 🧑‍⚖️ Human Decision Control")
-
-    for _, r in final_df.iterrows():
-        with st.expander(f"🏅 Rank {r['Final Rank']} — {r['Candidate']}"):
-            st.write(f"Resume Score: {r['Resume Score']}%")
-            st.write(f"Interview Score: {r['Interview Score']}%")
-            st.write(f"Final Score: {r['Final Score']}%")
-
-            c1, c2, c3 = st.columns(3)
-
-            with c1:
-                if st.button("✅ Hire", key=f"h_{r['Candidate']}"):
-                    st.session_state.final_decisions[r["Candidate"]] = "HIRE"
-                    st.success("HIRE saved")
-
-            with c2:
-                if st.button("🟡 Review", key=f"r_{r['Candidate']}"):
-                    st.session_state.final_decisions[r["Candidate"]] = "REVIEW"
-                    st.warning("REVIEW saved")
-
-            with c3:
-                if st.button("❌ Reject", key=f"x_{r['Candidate']}"):
-                    st.session_state.final_decisions[r["Candidate"]] = "REJECT"
-                    st.error("REJECT saved")
