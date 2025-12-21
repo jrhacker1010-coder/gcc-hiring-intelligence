@@ -157,18 +157,18 @@ top_n = st.selectbox(
     index=1
 )
 # ---------------- EXPORT SHORTLIST TO CSV ----------------
-csv = shortlisted_df.to_csv(index=False).encode("utf-8")
+           csv = shortlisted_df.to_csv(index=False).encode("utf-8")
 
-st.download_button(
-    label="⬇️ Download Shortlisted Candidates (CSV)",
-    data=csv,
-    file_name=f"shortlisted_top_{top_n}_candidates.csv",
-    mime="text/csv"
-)
+        st.download_button(
+           label="⬇️ Download Shortlisted Candidates (CSV)",
+           data=csv,
+           file_name=f"shortlisted_top_{top_n}_candidates.csv",
+           mime="text/csv"
+           )
 
 
 
-st.success(f"Showing Top {top_n} candidates shortlisted for interview")
+            st.success(f"Showing Top {top_n} candidates shortlisted for interview")
 
 
 
@@ -180,4 +180,5 @@ st.success(f"Showing Top {top_n} candidates shortlisted for interview")
                     st.write(f"**Matched Skills:** {row['Matched Skills']}")
                     st.write(f"**Missing Skills:** {row['Missing Skills']}")
                     st.info(row["AI Evaluation"])
+
 
