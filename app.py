@@ -179,13 +179,14 @@ st.success(f"Showing Top {top_n} candidates shortlisted for interview")
 
 
 st.markdown("## 🔍 Candidate Details")
-        for _, row in df.iterrows():
-            with st.expander(f"📄 Rank {row['Rank']} — {row['Candidate']} ({row['Decision']})"):
-                st.write(f"**Match Score:** {row['Match Score (%)']}%")
-                st.write(f"**Experience:** {row['Experience (Years)']} years")
-                st.write(f"**Matched Skills:** {row['Matched Skills']}")
-                st.write(f"**Missing Skills:** {row['Missing Skills']}")
-                st.info(row["AI Evaluation"])
+for _, row in df.iterrows():
+    with st.expander(f"📄 Rank {row['Rank']} — {row['Candidate']} ({row['Decision']})"):
+        st.write(f"**Match Score:** {row['Match Score (%)']}%")
+        st.write(f"**Experience:** {row['Experience (Years)']} years")
+        st.write(f"**Matched Skills:** {row['Matched Skills']}")
+        st.write(f"**Missing Skills:** {row['Missing Skills']}")
+        st.info(row["AI Evaluation"])
+
 
 
 
