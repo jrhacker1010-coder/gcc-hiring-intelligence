@@ -31,6 +31,12 @@ h1, h2, h3 { font-weight: 700; }
 
 # ---------------- GROQ CLIENT ----------------
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# ---------------- SESSION STATE ----------------
+if "interview_scores" not in st.session_state:
+    st.session_state["interview_scores"] = {}
+
+if "final_decisions" not in st.session_state:
+    st.session_state["final_decisions"] = {}
 
 # ---------------- LOAD SKILLS DATABASE ----------------
 @st.cache_data
@@ -210,3 +216,108 @@ if "screening_df" in st.session_state:
             """, unsafe_allow_html=True)
 
             st.info(row["AI Evaluation"])
+            # =====================================================
+# 🎤 INTERVIEW SCORING & FINAL DECISION (HUMAN-IN-LOOP)
+# =====================================================
+
+st.markdown("---")
+st.markdown("## 🎤 Interview Evaluation & Final Decision")
+
+selected_candidate = st.selectbox(
+    "Select Candidate for Interview Evaluation",
+    df["Candidate"].tolist()
+)
+
+st.markdown("### 🧠 Interview Scoring")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    technical = st.slider("Technical Skills", 1, 5)
+    communication = st.slider("Communication", 1, 5)
+
+with col2:
+    problem_solving = st.slider("Problem Solving", 1, 5)
+    cultural_fit = st.slider("Cultural Fit", 1, 5)
+
+interview_score = round(
+    (technical * 0.4 +
+     communication * 0.25 +
+     problem_solving * 0.25 +
+     cultural_fit * 0.1) * 20,
+    2
+)
+
+st.metric("Interview Score (/100)", interview_score)
+
+if st.button("✅ Submit Interview Feedback"):
+    st.session_state["interview_scores"][selected_candidate] = interview_score
+    st.success("Interview feedback recorded")
+
+# ---------------- FINAL TABULATION ----------------
+st.markdown("## 📊 Final Hiring Tabulation")
+
+final_rows = []
+
+for _, row in df.iterrows():
+    interview = st.session_state["interview_scores"].get(row["Candidate"], 0)
+    final_score = round(row["Match Score (%)"] * 0.6 + interview * 0.4, 2)
+
+    final_rows.append({
+        "Candidate": row["Candidate"],
+        "Resume Score": row["Match Score (%)"],
+        "Interview Score": interview,
+        "Final Score": final_score
+    })
+
+final_df = pd.DataFrame(final_rows).sort_values("Final Score", ascending=False)
+final_df["Final Rank"] = range(1, len(final_df) + 1)
+
+st.dataframe(final_df, use_container_width=True, hide_index=True)
+
+# ---------------- HUMAN DECISION ----------------
+st.markdown("## 🧑‍⚖️ Human Decision Control")
+
+for _, row in final_df.iterrows():
+    with st.expander(f"🏅 Rank {row['Final Rank']} — {row['Candidate']}"):
+        st.write(f"**Resume Score:** {row['Resume Score']}%")
+        st.write(f"**Interview Score:** {row['Interview Score']}%")
+        st.write(f"**Final Score:** {row['Final Score']}%")
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            if st.button(f"✅ Hire {row['Candidate']}", key=f"hire_{row['Candidate']}"):
+                st.session_state["final_decisions"][row["Candidate"]] = "HIRE"
+                st.success("Marked as HIRE")
+
+        with c2:
+            if st.button(f"🟡 Review {row['Candidate']}", key=f"review_{row['Candidate']}"):
+                st.session_state["final_decisions"][row["Candidate"]] = "REVIEW"
+                st.warning("Marked for REVIEW")
+
+        with c3:
+            if st.button(f"❌ Reject {row['Candidate']}", key=f"reject_{row['Candidate']}"):
+                st.session_state["final_decisions"][row["Candidate"]] = "REJECT"
+
+                rejection_email = f"""
+Dear {row['Candidate']},
+
+Thank you for your time and interest in our hiring process.
+
+Evaluation Summary:
+- Resume Score: {row['Resume Score']}%
+- Interview Score: {row['Interview Score']}%
+- Final Score: {row['Final Score']}%
+
+After careful consideration, we will not proceed further.
+
+Regards,
+GCC Hiring Team
+"""
+                st.error("Candidate Rejected")
+                st.info("📧 Rejection Email Sent (Simulated)")
+                st.code(rejection_email)
+
+            
+
