@@ -102,55 +102,60 @@ if menu == "Bulk Resume Screening":
         accept_multiple_files=True
     )
 
-    if st.button("Evaluate Candidates"):
-        if not jd or not uploaded_files:
-            st.warning("Please provide job description and upload resumes.")
-        else:
-            results = []
-            jd_skills = extract_jd_skills(jd)
+   if st.button("Evaluate Candidates"):
+    if not jd or not uploaded_files:
+        st.warning("Please provide job description and upload resumes.")
+    else:
+        results = []
+        jd_skills = extract_jd_skills(jd)
 
-            for file in uploaded_files:
-                resume_text = extract_text_from_pdf(file)
-                score = compute_match_score(jd.lower(), resume_text)
-                skills = extract_skills(resume_text)
-                exp = extract_experience(resume_text)
-                matched, missing = compare_skills(jd_skills, skills)
+        for file in uploaded_files:
+            resume_text = extract_text_from_pdf(file)
+            score = compute_match_score(jd.lower(), resume_text)
+            skills = extract_skills(resume_text)
+            exp = extract_experience(resume_text)
+            matched, missing = compare_skills(jd_skills, skills)
 
-                ai_result = ai_evaluation(
-                    jd,
-                    resume_text,
-                    score,
-                    matched,
-                    missing,
-                    exp
-                )
+            ai_result = ai_evaluation(
+                jd,
+                resume_text,
+                score,
+                matched,
+                missing,
+                exp
+            )
 
-                decision = (
-                    "HIRE" if "HIRE" in ai_result else
-                    "REVIEW" if "REVIEW" in ai_result else
-                    "REJECT"
-                )
+            decision = (
+                "HIRE" if "HIRE" in ai_result else
+                "REVIEW" if "REVIEW" in ai_result else
+                "REJECT"
+            )
 
-                results.append({
-                    "Candidate": file.name.replace(".pdf", ""),
-                    "Match Score (%)": score,
-                    "Decision": decision,
-                    "Experience (Years)": exp,
-                    "Matched Skills": ", ".join(matched),
-                    "Missing Skills": ", ".join(missing),
-                    "AI Evaluation": ai_result
-                })
+            results.append({
+                "Candidate": file.name.replace(".pdf", ""),
+                "Match Score (%)": score,
+                "Decision": decision,
+                "Experience (Years)": exp,
+                "Matched Skills": ", ".join(matched),
+                "Missing Skills": ", ".join(missing),
+                "AI Evaluation": ai_result
+            })
 
-df = pd.DataFrame(results).sort_values(
-    by="Match Score (%)",
-    ascending=False
-).reset_index(drop=True)
+        # ✅ CREATE DATAFRAME ONLY AFTER LOOP
+        df = pd.DataFrame(results).sort_values(
+            by="Match Score (%)",
+            ascending=False
+        ).reset_index(drop=True)
 
-# Add rank column
-df["Rank"] = df.index + 1
+        df["Rank"] = df.index + 1
 
-# Store dataframe in session state
-st.session_state["screening_df"] = df
+        st.session_state["screening_df"] = df
+
+        st.markdown("## 🧠 AI Screening Results")
+        st.dataframe(df, use_container_width=True)
+
+
+                
 
 # ---------------- SHORTLISTING (TOP-N) ----------------
 st.markdown("## ⭐ Shortlisting for Interview")
@@ -191,6 +196,7 @@ for _, row in df.iterrows():
         st.write(f"**Matched Skills:** {row['Matched Skills']}")
         st.write(f"**Missing Skills:** {row['Missing Skills']}")
         st.info(row["AI Evaluation"])
+
 
 
 
