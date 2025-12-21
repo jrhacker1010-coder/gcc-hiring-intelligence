@@ -147,8 +147,7 @@ if menu == "Bulk Resume Screening":
             ).reset_index(drop=True)
 
             df["Rank"] = df.index + 1
-
-          # ---------------- SHORTLISTING (TOP-N) ----------------
+# ---------------- SHORTLISTING (TOP-N) ----------------
 st.markdown("## ⭐ Shortlisting for Interview")
 
 top_n = st.selectbox(
@@ -156,15 +155,22 @@ top_n = st.selectbox(
     [5, 10, 15],
     index=1
 )
-# ---------------- EXPORT SHORTLIST TO CSV ----------------
-        csv = shortlisted_df.to_csv(index=False).encode("utf-8")
 
-        st.download_button(
-           label="⬇️ Download Shortlisted Candidates (CSV)",
-           data=csv,
-           file_name=f"shortlisted_top_{top_n}_candidates.csv",
-           mime="text/csv"
-           )
+shortlisted_df = df.head(top_n)
+
+st.success(f"Showing Top {top_n} candidates shortlisted for interview")
+
+st.dataframe(shortlisted_df, use_container_width=True)
+
+# ---------------- EXPORT SHORTLIST TO CSV ----------------
+csv = shortlisted_df.to_csv(index=False).encode("utf-8")
+
+st.download_button(
+    label="⬇️ Download Shortlisted Candidates (CSV)",
+    data=csv,
+    file_name=f"shortlisted_top_{top_n}_candidates.csv",
+    mime="text/csv"
+)
 
 
 
@@ -180,6 +186,7 @@ top_n = st.selectbox(
                     st.write(f"**Matched Skills:** {row['Matched Skills']}")
                     st.write(f"**Missing Skills:** {row['Missing Skills']}")
                     st.info(row["AI Evaluation"])
+
 
 
 
