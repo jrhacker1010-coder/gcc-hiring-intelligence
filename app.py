@@ -1,6 +1,11 @@
 import streamlit as st
 import pandas as pd
+import re
 from datetime import datetime, timedelta
+from pypdf import PdfReader
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from groq import Groq
 
 # Page config
 st.set_page_config(
@@ -75,8 +80,20 @@ st.markdown("""
         font-size: 0.75rem;
         font-weight: bold;
     }
+    .rank-badge {
+        background: linear-gradient(90deg,#6366f1,#8b5cf6);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
+
+# Initialize Groq client
+try:
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+except:
+    client = None
 
 # Initialize session state
 if 'chat_history' not in st.session_state:
@@ -84,12 +101,107 @@ if 'chat_history' not in st.session_state:
         {"role": "assistant", "content": "Hello! I'm your AI Hiring Assistant. I can help with resume screening, interview scheduling, candidate insights, and hiring analytics. What would you like to know?"}
     ]
 
-# Mock data
+if "interview_scores" not in st.session_state:
+    st.session_state.interview_scores = {}
+
+if "final_decisions" not in st.session_state:
+    st.session_state.final_decisions = {}
+
+if "screening_df" not in st.session_state:
+    st.session_state.screening_df = None
+
+# Skills database
+@st.cache_data
+def load_skills_db():
+    skills = [
+        "python", "java", "javascript", "typescript", "react", "angular", "vue",
+        "node.js", "express", "django", "flask", "spring boot", "aws", "azure",
+        "gcp", "docker", "kubernetes", "ci/cd", "jenkins", "git", "sql", "nosql",
+        "mongodb", "postgresql", "mysql", "redis", "kafka", "rabbitmq",
+        "machine learning", "deep learning", "tensorflow", "pytorch", "nlp",
+        "computer vision", "data science", "pandas", "numpy", "scikit-learn",
+        "rest api", "graphql", "microservices", "agile", "scrum", "jira"
+    ]
+    return skills
+
+SKILLS_DB = load_skills_db()
+
+# Resume screening functions
+def extract_text_from_pdf(file):
+    reader = PdfReader(file)
+    return " ".join([p.extract_text() for p in reader.pages if p.extract_text()]).lower()
+
+def extract_skills(text):
+    return sorted({s for s in SKILLS_DB if s in text})
+
+def extract_jd_skills(text):
+    return sorted({s for s in SKILLS_DB if s in text.lower()})
+
+def extract_experience(text):
+    matches = re.findall(r"(\d+)\+?\s*(years|yrs)", text.lower())
+    return max([int(m[0]) for m in matches], default=0)
+
+def compute_match_score(jd, resume):
+    tfidf = TfidfVectorizer(stop_words="english")
+    vectors = tfidf.fit_transform([jd, resume])
+    return round(cosine_similarity(vectors)[0][1] * 100, 2)
+
+def skill_match_score(jd_skills, resume_skills):
+    if not jd_skills:
+        return 0
+    return round((len(set(jd_skills) & set(resume_skills)) / len(jd_skills)) * 100, 2)
+
+def experience_score(exp):
+    if exp >= 5:
+        return 100
+    elif exp >= 3:
+        return 75
+    elif exp >= 1:
+        return 50
+    else:
+        return 25
+
+def compute_resume_score(jd, resume_text, jd_skills, resume_skills, exp):
+    text_score = compute_match_score(jd, resume_text)
+    skill_score = skill_match_score(jd_skills, resume_skills)
+    exp_score = experience_score(exp)
+    return round(text_score * 0.5 + skill_score * 0.3 + exp_score * 0.2, 2)
+
+def ai_evaluation(jd, resume, score, matched, missing, exp):
+    if not client:
+        return "Decision: REVIEW\nReason: AI evaluation not available"
+    
+    prompt = f"""
+Job Description:
+{jd}
+
+Resume:
+{resume[:1500]}
+
+Match Score: {score}
+Experience: {exp}
+Matched Skills: {matched}
+Missing Skills: {missing}
+
+Respond only:
+Decision: HIRE / REVIEW / REJECT
+Reason: short
+"""
+    try:
+        res = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return res.choices[0].message.content
+    except:
+        return "Decision: REVIEW\nReason: AI evaluation failed"
+
+# Mock data with Tamil Nadu names
 @st.cache_data
 def load_mock_data():
     candidates = pd.DataFrame({
-        'name': ['Priya Sharma', 'Rahul Kumar', 'Ananya Iyer', 'Arjun Patel', 'Meera Joshi', 
-                 'Karthik Nair', 'Sneha Reddy', 'Vikram Singh', 'Pooja Desai', 'Amit Verma'],
+        'name': ['Karthik Raja', 'Deepa Lakshmi', 'Anitha Devi', 'Rajesh Kumar', 'Priya Sundaram', 
+                 'Vijay Raman', 'Divya Balaji', 'Murugan Selvan', 'Kavitha Moorthy', 'Senthil Nathan'],
         'role': ['Senior Software Engineer', 'Data Scientist', 'DevOps Engineer', 'Full Stack Developer',
                  'Backend Developer', 'Frontend Developer', 'ML Engineer', 'Cloud Architect',
                  'Product Manager', 'QA Engineer'],
@@ -149,7 +261,6 @@ st.markdown("---")
 
 # Dashboard Page
 if page == "📊 Dashboard":
-    # Key Metrics
     col1, col2, col3, col4, col5, col6 = st.columns(6)
     
     with col1:
@@ -167,7 +278,6 @@ if page == "📊 Dashboard":
     
     st.markdown("---")
     
-    # Visual Funnel
     col1, col2 = st.columns(2)
     
     with col1:
@@ -214,7 +324,6 @@ if page == "📊 Dashboard":
     
     st.markdown("---")
     
-    # Alerts and Insights
     col1, col2 = st.columns(2)
     
     with col1:
@@ -223,7 +332,7 @@ if page == "📊 Dashboard":
         st.markdown("""
         <div class='alert-high'>
             <strong>🔴 High Drop-off Risk</strong><br>
-            <span style='font-size: 0.9rem;'>Ananya Iyer - DevOps Engineer (68% engagement)<br>
+            <span style='font-size: 0.9rem;'>Anitha Devi - DevOps Engineer (68% engagement)<br>
             <em>Recommendation: Expedite decision & personalized outreach</em></span>
         </div>
         """, unsafe_allow_html=True)
@@ -253,7 +362,6 @@ if page == "📊 Dashboard":
         
         st.warning("**Predictions**\n- Expected 18 offers this month (vs 12 actual)\n- 3 candidates likely to decline offers\n- Recommend salary adjustment for DevOps roles")
     
-    # Top Candidates
     st.markdown("---")
     st.markdown("#### 🌟 Top Candidates This Week")
     
@@ -271,76 +379,138 @@ if page == "📊 Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-# AI Screening Page
+# AI Screening Page - Using your original code
 elif page == "🔍 AI Screening":
-    st.markdown("### 🔍 AI Resume Screening")
+    st.markdown("### 🔍 AI Resume Screening & Evaluation")
     
-    # Upload Section
-    with st.expander("📤 Upload New Resumes", expanded=True):
-        uploaded_files = st.file_uploader(
-            "Drop resume files here (PDF, DOCX)",
-            type=['pdf', 'docx'],
-            accept_multiple_files=True
-        )
-        
-        col1, col2, col3 = st.columns([2, 1, 2])
-        with col2:
-            if st.button("🚀 Start AI Screening", type="primary", use_container_width=True):
-                if uploaded_files:
-                    with st.spinner("AI is analyzing resumes..."):
-                        import time
-                        time.sleep(2)
-                    st.success(f"✅ Screened {len(uploaded_files)} resumes!")
-                    st.balloons()
+    jd = st.text_area("📌 Job Description", height=180, placeholder="Enter the job description here...")
+    files = st.file_uploader(
+        "📤 Upload Resumes (PDF)",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
     
-    st.markdown("---")
+    if st.button("🚀 Evaluate Candidates", type="primary"):
+        if not jd or not files:
+            st.warning("Please provide Job Description and upload resumes")
+        else:
+            with st.spinner("AI is analyzing resumes..."):
+                rows = []
+                
+                for f in files:
+                    text = extract_text_from_pdf(f)
+                    skills = extract_skills(text)
+                    jd_skills = extract_jd_skills(jd)
+                    exp = extract_experience(text)
+                    missing = list(set(jd_skills) - set(skills))
+                    
+                    resume_score = compute_resume_score(jd, text, jd_skills, skills, exp)
+                    
+                    ai = ai_evaluation(jd, text, resume_score, skills, missing, exp)
+                    decision = (
+                        "HIRE" if "HIRE" in ai else
+                        "REVIEW" if "REVIEW" in ai else
+                        "REJECT"
+                    )
+                    
+                    rows.append({
+                        "Candidate": f.name.replace(".pdf", ""),
+                        "Resume Score (%)": resume_score,
+                        "AI Decision": decision,
+                        "Experience": exp,
+                        "Matched Skills": ", ".join(skills),
+                        "Missing Skills": ", ".join(missing),
+                        "AI Reason": ai
+                    })
+                
+                df = (
+                    pd.DataFrame(rows)
+                    .sort_values("Resume Score (%)", ascending=False)
+                    .reset_index(drop=True)
+                )
+                df["Rank"] = df.index + 1
+                st.session_state.screening_df = df
+                
+            st.success("✅ Screening completed!")
+            st.balloons()
     
-    # Filters
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        score_filter = st.slider("Minimum Match Score", 0, 100, 70)
-    with col2:
-        role_filter = st.multiselect("Filter by Role", candidates_df['role'].unique())
-    with col3:
-        status_filter = st.multiselect("Filter by Status", candidates_df['status'].unique())
-    
-    # Apply filters
-    filtered_df = candidates_df[candidates_df['score'] >= score_filter]
-    if role_filter:
-        filtered_df = filtered_df[filtered_df['role'].isin(role_filter)]
-    if status_filter:
-        filtered_df = filtered_df[filtered_df['status'].isin(status_filter)]
-    
-    st.markdown(f"### 📋 Screened Candidates ({len(filtered_df)} results)")
-    
-    # Display candidates
-    for idx, row in filtered_df.iterrows():
-        col1, col2, col3 = st.columns([3, 1, 1])
-        
-        with col1:
-            st.markdown(f"#### {row['name']}")
-            st.caption(f"{row['role']} • {row['experience']}")
-            
-            skills = row['skills'].split(', ')
-            skills_html = ''.join([f"<span class='skill-badge'>{skill}</span>" for skill in skills[:5]])
-            st.markdown(skills_html, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown(f"<div style='text-align: center;'><div style='font-size: 2rem; font-weight: bold; color: #4F46E5;'>{row['score']}%</div><div style='font-size: 0.85rem; color: #6B7280;'>Match Score</div></div>", unsafe_allow_html=True)
-        
-        with col3:
-            risk_color = {"low": "🟢", "medium": "🟡", "high": "🔴"}
-            st.markdown(f"**Risk:** {risk_color[row['risk']]} {row['risk'].upper()}")
-            
-            col_a, col_b = st.columns(2)
-            with col_a:
-                if st.button("👁️ View", key=f"view_{idx}", use_container_width=True):
-                    st.info(f"Profile: {row['name']}")
-            with col_b:
-                if st.button("✉️ Email", key=f"contact_{idx}", use_container_width=True):
-                    st.success(f"Sent to {row['name']}")
+    # Display results if available
+    if st.session_state.screening_df is not None:
+        df = st.session_state.screening_df
         
         st.markdown("---")
+        st.markdown("## 🧠 Screening Results")
+        st.dataframe(df, hide_index=True, use_container_width=True)
+        
+        # Interview Evaluation
+        st.markdown("---")
+        st.markdown("## 🎤 Interview Evaluation")
+        
+        candidate = st.selectbox("Select Candidate for Interview", df["Candidate"].tolist())
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            tech = st.slider("Technical Skills", 1, 5, 3)
+            comm = st.slider("Communication", 1, 5, 3)
+        with c2:
+            prob = st.slider("Problem Solving", 1, 5, 3)
+            culture = st.slider("Cultural Fit", 1, 5, 3)
+        
+        interview_score = round((tech*0.4 + comm*0.25 + prob*0.25 + culture*0.1) * 20, 2)
+        st.metric("Interview Score", f"{interview_score}%")
+        
+        if st.button("💾 Save Interview Score"):
+            st.session_state.interview_scores[candidate] = interview_score
+            st.success(f"✅ Interview score saved for {candidate}")
+        
+        # Final Hiring Table
+        st.markdown("---")
+        st.markdown("## 📊 Final Hiring Decision Table")
+        
+        final = []
+        for _, r in df.iterrows():
+            i = st.session_state.interview_scores.get(r["Candidate"], 0)
+            final.append({
+                "Candidate": r["Candidate"],
+                "Resume Score": r["Resume Score (%)"],
+                "Interview Score": i,
+                "Final Score": round(r["Resume Score (%)"] * 0.5 + i * 0.5, 2),
+                "Human Decision": st.session_state.final_decisions.get(r["Candidate"], "PENDING")
+            })
+        
+        final_df = pd.DataFrame(final).sort_values("Final Score", ascending=False)
+        final_df["Final Rank"] = range(1, len(final_df) + 1)
+        st.dataframe(final_df, hide_index=True, use_container_width=True)
+        
+        # Human Decision Control
+        st.markdown("---")
+        st.markdown("## 🧑‍⚖️ Human Decision Control")
+        
+        for _, r in final_df.iterrows():
+            with st.expander(f"🏅 Rank {r['Final Rank']} — {r['Candidate']} (Final Score: {r['Final Score']}%)"):
+                st.write(f"**Resume Score:** {r['Resume Score']}%")
+                st.write(f"**Interview Score:** {r['Interview Score']}%")
+                st.write(f"**Final Score:** {r['Final Score']}%")
+                
+                c1, c2, c3 = st.columns(3)
+                
+                with c1:
+                    if st.button("✅ Hire", key=f"h_{r['Candidate']}"):
+                        st.session_state.final_decisions[r["Candidate"]] = "HIRE"
+                        st.success("HIRE decision saved")
+                        st.rerun()
+                
+                with c2:
+                    if st.button("🟡 Review", key=f"r_{r['Candidate']}"):
+                        st.session_state.final_decisions[r["Candidate"]] = "REVIEW"
+                        st.warning("REVIEW decision saved")
+                        st.rerun()
+                
+                with c3:
+                    if st.button("❌ Reject", key=f"x_{r['Candidate']}"):
+                        st.session_state.final_decisions[r["Candidate"]] = "REJECT"
+                        st.error("REJECT decision saved")
+                        st.rerun()
 
 # Interviews Page
 elif page == "📅 Interviews":
@@ -352,10 +522,10 @@ elif page == "📅 Interviews":
         st.markdown("#### 🗓️ Upcoming Interviews")
         
         interviews = [
-            {"name": "Priya Sharma", "role": "Senior SWE", "time": "Today, 2:00 PM", "interviewer": "Vikram Singh"},
-            {"name": "Rahul Kumar", "role": "Data Scientist", "time": "Tomorrow, 10:00 AM", "interviewer": "Sneha Reddy"},
-            {"name": "Arjun Patel", "role": "Full Stack", "time": "Dec 23, 3:00 PM", "interviewer": "Amit Verma"},
-            {"name": "Meera Joshi", "role": "Backend Dev", "time": "Dec 24, 11:00 AM", "interviewer": "Karthik Nair"}
+            {"name": "Karthik Raja", "role": "Senior SWE", "time": "Today, 2:00 PM", "interviewer": "Murugan Selvan"},
+            {"name": "Deepa Lakshmi", "role": "Data Scientist", "time": "Tomorrow, 10:00 AM", "interviewer": "Divya Balaji"},
+            {"name": "Rajesh Kumar", "role": "Full Stack", "time": "Dec 23, 3:00 PM", "interviewer": "Senthil Nathan"},
+            {"name": "Priya Sundaram", "role": "Backend Dev", "time": "Dec 24, 11:00 AM", "interviewer": "Vijay Raman"}
         ]
         
         for interview in interviews:
@@ -383,9 +553,9 @@ elif page == "📅 Interviews":
         st.markdown("#### ⏳ Feedback Pending")
         
         pending = [
-            {"name": "Meera Joshi", "role": "Backend Dev", "date": "Dec 18", "status": "Awaiting Feedback"},
-            {"name": "Karthik Nair", "role": "Frontend Dev", "date": "Dec 19", "status": "Partial Feedback"},
-            {"name": "Sneha Reddy", "role": "ML Engineer", "date": "Dec 20", "status": "Awaiting Feedback"}
+            {"name": "Priya Sundaram", "role": "Backend Dev", "date": "Dec 18", "status": "Awaiting Feedback"},
+            {"name": "Vijay Raman", "role": "Frontend Dev", "date": "Dec 19", "status": "Partial Feedback"},
+            {"name": "Divya Balaji", "role": "ML Engineer", "date": "Dec 20", "status": "Awaiting Feedback"}
         ]
         
         for item in pending:
@@ -413,7 +583,6 @@ elif page == "📅 Interviews":
 elif page == "👥 Candidates":
     st.markdown("### 👥 Candidate Pipeline")
     
-    # Search and filters
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         search = st.text_input("🔍 Search", placeholder="Name, role, or skills...")
@@ -422,10 +591,8 @@ elif page == "👥 Candidates":
     with col3:
         sort_by = st.selectbox("Sort by", ["Match Score", "Name", "Status"])
     
-    # Display table
     display_df = candidates_df.copy()
     
-    # Apply filters
     if search:
         display_df = display_df[
             display_df['name'].str.contains(search, case=False) |
@@ -436,13 +603,11 @@ elif page == "👥 Candidates":
     if risk_filter != "All":
         display_df = display_df[display_df['risk'] == risk_filter.lower()]
     
-    # Sort
     if sort_by == "Match Score":
         display_df = display_df.sort_values('score', ascending=False)
     elif sort_by == "Name":
         display_df = display_df.sort_values('name')
     
-    # Display as cards
     for idx, row in display_df.iterrows():
         st.markdown(f"""
         <div class='candidate-card'>
@@ -471,7 +636,6 @@ elif page == "👥 Candidates":
             if st.button("Details", key=f"details_{idx}", use_container_width=True):
                 st.info(f"Opening {row['name']}")
     
-    # Download
     st.markdown("---")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -492,35 +656,3 @@ else:
     for message in st.session_state.chat_history:
         with st.chat_message(message["role"]):
             st.write(message["content"])
-    
-    if prompt := st.chat_input("Ask me anything..."):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
-        
-        prompt_lower = prompt.lower()
-        
-        if any(word in prompt_lower for word in ['screen', 'resume', 'candidate']):
-            response = "📊 Top candidates this week:\n\n• **Priya Sharma** (92%) - Senior SWE\n• **Sneha Reddy** (90%) - ML Engineer\n• **Rahul Kumar** (88%) - Data Scientist\n\nNeed detailed reports?"
-        
-        elif any(word in prompt_lower for word in ['schedule', 'interview']):
-            response = "📅 8 interviews scheduled:\n\n**Today:**\n• Priya Sharma - 2:00 PM\n\n**Tomorrow:**\n• Rahul Kumar - 10:00 AM\n\nWant me to auto-schedule more?"
-        
-        elif any(word in prompt_lower for word in ['offer', 'drop', 'risk']):
-            response = "⚠️ **Alert:**\n\n**Ananya Iyer** - 68% engagement (HIGH risk)\n\n**Actions:**\n1. Expedite decision (48h)\n2. Personalized outreach\n3. Consider +8-12% adjustment"
-        
-        elif any(word in prompt_lower for word in ['insight', 'analytics']):
-            response = "📈 **Insights:**\n\n• Time-to-hire: 18 days (↓15%)\n• Acceptance rate: 88%\n• Python most in-demand\n• 78% prefer hybrid\n• LinkedIn best source"
-        
-        else:
-            response = "I can help with:\n\n🔍 Resume screening\n📅 Interview scheduling\n📊 Analytics\n⚠️ Risk prediction\n\nWhat would you like?"
-        
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
-        st.rerun()
-
-# Footer
-st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: #6B7280; font-size: 0.9rem;'>"
-    "🧠 GCC Hiring Intelligence Platform | Hackathon 2025"
-    "</div>",
-    unsafe_allow_html=True
-)
