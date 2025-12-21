@@ -62,6 +62,33 @@ def compute_match_score(jd, resume):
     tfidf = TfidfVectorizer(stop_words="english")
     vectors = tfidf.fit_transform([jd, resume])
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
+def skill_match_score(jd_skills, resume_skills):
+    if not jd_skills:
+        return 0
+    return round((len(set(jd_skills) & set(resume_skills)) / len(jd_skills)) * 100, 2)
+
+def experience_score(exp):
+    if exp >= 5:
+        return 100
+    elif exp >= 3:
+        return 75
+    elif exp >= 1:
+        return 50
+    else:
+        return 25
+
+def compute_resume_score(jd, resume_text, jd_skills, resume_skills, exp):
+    text_score = compute_match_score(jd, resume_text)          # 0–100
+    skill_score = skill_match_score(jd_skills, resume_skills) # 0–100
+    exp_score = experience_score(exp)                          # 0–100
+
+    return round(
+        text_score * 0.5 +
+        skill_score * 0.3 +
+        exp_score * 0.2,
+        2
+    )
+    
 
 def ai_evaluation(jd, resume, score, matched, missing, exp):
     prompt = f"""
@@ -101,7 +128,8 @@ if st.button("🚀 Evaluate Candidates"):
 
         for f in files:
             text = extract_text_from_pdf(f)
-            score = compute_match_score(jd, text)
+            resume_score = compute_resume_score(jd, text, jd_skills, skills, exp)
+
             skills = extract_skills(text)
             jd_skills = extract_jd_skills(jd)
             exp = extract_experience(text)
@@ -112,15 +140,15 @@ if st.button("🚀 Evaluate Candidates"):
 
             rows.append({
                 "Candidate": f.name.replace(".pdf", ""),
-                "Match Score (%)": score,
+                "Resume Score (%)": resume_score,
                 "AI Decision": decision,
                 "Experience": exp,
                 "Matched Skills": ", ".join(skills),
                 "Missing Skills": ", ".join(missing),
                 "AI Reason": ai
-            })
+                })
 
-        df = pd.DataFrame(rows).sort_values("Match Score (%)", ascending=False).reset_index(drop=True)
+        df = pd.DataFrame(rows).sort_values("Resume Score (%)", ascending=False).reset_index(drop=True)
         df["Rank"] = df.index + 1
         st.session_state.screening_df = df
         st.success("✅ Screening completed")
@@ -164,7 +192,7 @@ if "screening_df" in st.session_state:
             "Candidate": r["Candidate"],
             "Resume Score": r["Match Score (%)"],
             "Interview Score": i,
-            "Final Score": round(r["Match Score (%)"]*0.6 + i*0.4, 2),
+            "Final Score": round(r["Resume Score (%)"]*0.5 + i*0.5, 2),
             "Human Decision": st.session_state.final_decisions.get(r["Candidate"], "PENDING")
         })
 
@@ -197,3 +225,4 @@ if "screening_df" in st.session_state:
                 if st.button("❌ Reject", key=f"x_{r['Candidate']}"):
                     st.session_state.final_decisions[r["Candidate"]] = "REJECT"
                     st.error("REJECT saved")
+
