@@ -7,7 +7,27 @@ from sklearn.metrics.pairwise import cosine_similarity
 from groq import Groq
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="GCC AI Hiring Platform", layout="wide")
+st.set_page_config(
+    page_title="GCC AI Hiring Platform",
+    layout="wide"
+)
+
+# ---------------- STYLE ----------------
+st.markdown("""
+<style>
+h1, h2, h3 { font-weight: 700; }
+.rank-badge {
+    background: linear-gradient(90deg,#6366f1,#8b5cf6);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+.decision-hire { color: #16a34a; font-weight: bold; }
+.decision-review { color: #ca8a04; font-weight: bold; }
+.decision-reject { color: #dc2626; font-weight: bold; }
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------- GROQ CLIENT ----------------
 client = Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -20,10 +40,14 @@ def load_skills_db():
 
 SKILLS_DB = load_skills_db()
 
-# ---------------- HELPERS ----------------
+# ---------------- HELPERS (UNCHANGED CORE LOGIC) ----------------
 def extract_text_from_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
-    return " ".join([p.extract_text() or "" for p in reader.pages]).lower()
+    text = []
+    for page in reader.pages:
+        if page.extract_text():
+            text.append(page.extract_text())
+    return " ".join(text).lower()
 
 def extract_skills(text):
     return sorted({s for s in SKILLS_DB if s in text})
@@ -33,7 +57,9 @@ def extract_jd_skills(jd_text):
     return sorted({s for s in SKILLS_DB if s in jd_text})
 
 def compare_skills(jd_skills, resume_skills):
-    return list(set(jd_skills) & set(resume_skills)), list(set(jd_skills) - set(resume_skills))
+    matched = sorted(set(jd_skills) & set(resume_skills))
+    missing = sorted(set(jd_skills) - set(resume_skills))
+    return matched, missing
 
 def extract_experience(text):
     matches = re.findall(r"(\d+)\+?\s*(years|yrs)", text.lower())
@@ -44,8 +70,11 @@ def compute_match_score(jd, resume):
     vectors = tfidf.fit_transform([jd, resume])
     return round(cosine_similarity(vectors)[0][1] * 100, 2)
 
+# ---------------- AI DECISION USING GROQ ----------------
 def ai_evaluation(jd, resume, score, matched, missing, experience):
     prompt = f"""
+You are an AI hiring expert for a Global Capability Center.
+
 Job Description:
 {jd}
 
@@ -57,85 +86,127 @@ Experience: {experience} years
 Matched Skills: {matched}
 Missing Skills: {missing}
 
-Respond ONLY:
-Decision: HIRE / REVIEW / REJECT
-Reason: short explanation
+Rules:
+- Strong match → HIRE
+- Partial match → REVIEW
+- Weak relevance → REJECT
+
+Respond ONLY in this format:
+Decision: <HIRE/REVIEW/REJECT>
+Reason: <short explanation>
 """
-    res = client.chat.completions.create(
+
+    response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}]
     )
-    return res.choices[0].message.content
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("GCC Hiring Platform")
-menu = st.sidebar.radio("Menu", ["Bulk Resume Screening"])
+    return response.choices[0].message.content
 
-# ---------------- BULK SCREENING ----------------
-if menu == "Bulk Resume Screening":
-    st.title("📄 Bulk Resume Screening with AI")
+# ---------------- UI ----------------
+st.title("📄 GCC AI Resume Screening Platform")
 
-    jd = st.text_area("📌 Job Description", height=180)
-    uploaded_files = st.file_uploader(
-        "📤 Upload Resumes (PDF)",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
+jd = st.text_area("📌 Job Description", height=180)
 
-    if st.button("Evaluate Candidates"):
-        if not jd or not uploaded_files:
-            st.warning("Please provide JD and resumes")
-        else:
-            results = []
-            jd_skills = extract_jd_skills(jd)
+uploaded_files = st.file_uploader(
+    "📤 Upload Candidate Resumes (PDF)",
+    type=["pdf"],
+    accept_multiple_files=True
+)
 
-            for file in uploaded_files:
-                resume_text = extract_text_from_pdf(file)
-                score = compute_match_score(jd.lower(), resume_text)
-                skills = extract_skills(resume_text)
-                exp = extract_experience(resume_text)
-                matched, missing = compare_skills(jd_skills, skills)
+# ---------------- EVALUATION ----------------
+if st.button("🚀 Evaluate Candidates"):
+    if not jd or not uploaded_files:
+        st.warning("Please provide Job Description and upload resumes.")
+    else:
+        results = []
+        jd_skills = extract_jd_skills(jd)
 
-                ai_result = ai_evaluation(jd, resume_text, score, matched, missing, exp)
-                decision = "HIRE" if "HIRE" in ai_result else "REVIEW" if "REVIEW" in ai_result else "REJECT"
+        for file in uploaded_files:
+            resume_text = extract_text_from_pdf(file)
+            score = compute_match_score(jd.lower(), resume_text)
+            skills = extract_skills(resume_text)
+            exp = extract_experience(resume_text)
+            matched, missing = compare_skills(jd_skills, skills)
 
-                results.append({
-                    "Candidate": file.name.replace(".pdf", ""),
-                    "Match Score (%)": score,
-                    "Decision": decision,
-                    "Experience (Years)": exp,
-                    "Matched Skills": ", ".join(matched),
-                    "Missing Skills": ", ".join(missing),
-                    "AI Evaluation": ai_result
-                })
+            ai_result = ai_evaluation(jd, resume_text, score, matched, missing, exp)
 
-            df = pd.DataFrame(results).sort_values("Match Score (%)", ascending=False).reset_index(drop=True)
-            df["Rank"] = df.index + 1
+            decision = (
+                "HIRE" if "HIRE" in ai_result else
+                "REVIEW" if "REVIEW" in ai_result else
+                "REJECT"
+            )
 
-            st.session_state["screening_df"] = df
+            results.append({
+                "Candidate": file.name.replace(".pdf", ""),
+                "Match Score (%)": score,
+                "Decision": decision,
+                "Experience (Years)": exp,
+                "Matched Skills": ", ".join(matched),
+                "Missing Skills": ", ".join(missing),
+                "AI Evaluation": ai_result
+            })
 
-            st.success("✅ Screening completed")
-            st.dataframe(df, use_container_width=True)
+        df = pd.DataFrame(results).sort_values(
+            by="Match Score (%)",
+            ascending=False
+        ).reset_index(drop=True)
 
-# ---------------- SHORTLISTING ----------------
+        df["Rank"] = df.index + 1
+        st.session_state["screening_df"] = df
+
+        st.success("✅ Screening completed successfully")
+
+# ---------------- RESULTS ----------------
 if "screening_df" in st.session_state:
     df = st.session_state["screening_df"]
 
+    st.markdown("## 🧠 AI Screening Results")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # ---------------- SHORTLISTING ----------------
     st.markdown("## ⭐ Shortlisting for Interview")
-    top_n = st.slider("Select Top N Candidates", 1, len(df), 5)
 
-    shortlisted_df = df.head(top_n)
-    st.dataframe(shortlisted_df, use_container_width=True)
-
-    csv = shortlisted_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "⬇️ Download Shortlisted CSV",
-        csv,
-        f"shortlisted_top_{top_n}.csv",
-        "text/csv"
+    top_n = st.slider(
+        "Select Top N Candidates",
+        min_value=1,
+        max_value=min(10, len(df)),
+        value=5
     )
 
+    shortlisted_df = df.head(top_n)
+
+    st.success(f"Top {top_n} candidates shortlisted")
+
+    st.dataframe(shortlisted_df, use_container_width=True, hide_index=True)
+
+    csv = shortlisted_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download Shortlisted CSV",
+        data=csv,
+        file_name=f"top_{top_n}_candidates.csv",
+        mime="text/csv"
+    )
+
+    # ---------------- DETAILS ----------------
     st.markdown("## 🔍 Candidate Details")
+
     for _, row in df.iterrows():
-        with st.expander(f"Rank {row['Rank']} — {row['Candidate']} ({row['Decision']})"):
-            st.write(row["AI Evaluation"])
+        decision_class = (
+            "decision-hire" if row["Decision"] == "HIRE" else
+            "decision-review" if row["Decision"] == "REVIEW" else
+            "decision-reject"
+        )
+
+        with st.expander(f"🏅 Rank {row['Rank']} — {row['Candidate']}"):
+            st.markdown(f"""
+            <span class="rank-badge">Rank {row['Rank']}</span><br><br>
+            <b>Decision:</b> <span class="{decision_class}">{row['Decision']}</span><br>
+            <b>Match Score:</b> {row['Match Score (%)']}%<br>
+            <b>Experience:</b> {row['Experience (Years)']} years<br>
+            <b>Matched Skills:</b> {row['Matched Skills']}<br>
+            <b>Missing Skills:</b> {row['Missing Skills']}
+            """, unsafe_allow_html=True)
+
+            st.info(row["AI Evaluation"])
