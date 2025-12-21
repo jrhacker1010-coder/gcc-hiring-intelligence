@@ -4,12 +4,16 @@ import re
 from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from groq import Groq
+
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
     page_title="GCC AI Hiring Decision Platform",
     layout="wide"
 )
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
 
 # ---------------- STYLE ----------------
 st.markdown("""
@@ -90,8 +94,10 @@ menu = st.sidebar.radio("Menu", [
     "Bulk Resume Screening",
     "Interview Evaluation",
     "Interviewee Community Feedback",
-    "Final Decision & Email"
+    "Final Decision & Email",
+    "AI Resume Chatbot (Groq)"
 ])
+
 
 # ---------------- DASHBOARD ----------------
 if menu == "Dashboard":
@@ -201,6 +207,44 @@ elif menu == "Interviewee Community Feedback":
 
     for f in st.session_state.community_feedback:
         st.info(f"**{f['Name']}**: {f['Feedback']}")
+# ---------------- AI RESUME CHATBOT (GROQ) ----------------
+elif menu == "AI Resume Chatbot (Groq)":
+    st.title("🤖 AI Resume Screening Chatbot")
+
+    jd_input = st.text_area("📌 Job Description", height=180)
+    resume_input = st.text_area("📄 Resume Content", height=250)
+
+    if st.button("Ask AI"):
+        if not jd_input or not resume_input:
+            st.warning("Please paste both Job Description and Resume.")
+        else:
+            with st.spinner("Groq AI is analyzing the resume..."):
+                response = client.chat.completions.create(
+                    model="llama3-70b-8192",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert AI hiring assistant for Global Capability Centers."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"""
+                            Job Description:
+                            {jd_input}
+
+                            Resume:
+                            {resume_input}
+
+                            Evaluate the candidate and give a final HIRE or REJECT decision with reasons.
+                            """
+                        }
+                    ]
+                )
+
+                st.success("🧠 AI Result")
+                st.write(response.choices[0].message.content)
+
+
 
 # ---------------- FINAL DECISION & EMAIL ----------------
 elif menu == "Final Decision & Email":
@@ -219,3 +263,4 @@ elif menu == "Final Decision & Email":
         st.success("📧 Result emails sent to candidates (simulated)")
     else:
         st.warning("Please complete resume screening first.")
+
