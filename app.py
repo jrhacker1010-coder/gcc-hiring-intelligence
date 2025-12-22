@@ -78,8 +78,11 @@ if "final_decisions" not in st.session_state:
 if "feedback_comments" not in st.session_state:
     st.session_state.feedback_comments = []
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+if "admin_chat_history" not in st.session_state:
+    st.session_state.admin_chat_history = []
+
+if "candidate_chat_history" not in st.session_state:
+    st.session_state.candidate_chat_history = []
 
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -601,7 +604,7 @@ else:
             st.markdown('<p class="section-header">💬 Admin Chatbot</p>', unsafe_allow_html=True)
             st.write("Ask questions about candidates, decisions, and hiring process")
             
-            for msg in st.session_state.chat_history:
+            for msg in st.session_state.admin_chat_history:
                 if msg["role"] == "user":
                     st.markdown(f"**You:** {msg['content']}")
                 else:
@@ -611,11 +614,11 @@ else:
             
             if st.button("Send", key="send_chat"):
                 if user_input:
-                    st.session_state.chat_history.append({"role": "user", "content": user_input})
+                    st.session_state.admin_chat_history.append({"role": "user", "content": user_input})
                     
                     bot_response = get_admin_chatbot_response(user_input)
                     
-                    st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
+                    st.session_state.admin_chat_history.append({"role": "assistant", "content": bot_response})
                     st.rerun()
         
         with tab3:
@@ -670,7 +673,7 @@ else:
             st.markdown('<p class="section-header">💬 Candidate Chatbot</p>', unsafe_allow_html=True)
             st.write("Ask questions about your application and the hiring process")
             
-            for msg in st.session_state.chat_history:
+            for msg in st.session_state.candidate_chat_history:
                 if msg["role"] == "user":
                     st.markdown(f"**You:** {msg['content']}")
                 else:
@@ -680,11 +683,11 @@ else:
             
             if st.button("Send", key="send_chat"):
                 if user_input:
-                    st.session_state.chat_history.append({"role": "user", "content": user_input})
+                    st.session_state.candidate_chat_history.append({"role": "user", "content": user_input})
                     
                     bot_response = get_candidate_chatbot_response(user_input, st.session_state.candidate_name)
                     
-                    st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
+                    st.session_state.candidate_chat_history.append({"role": "assistant", "content": bot_response})
                     st.rerun()
         
         with tab3:
