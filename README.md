@@ -1,142 +1,231 @@
-🚀 AI-Powered GCC Hiring Intelligence Platform
-📌 Problem Statement
+# 🎯 GCC AI Hiring Platform  
+**GCC X-Shift Hackathon 2025**  
+**Problem Option: Hiring in Global Capability Centers (GCCs)**
 
-Global Capability Centers (GCCs) often rely on manual, fragmented, and biased hiring workflows.
-This results in:
+---
 
-Slow screening cycles
+## 📖 Introduction
 
-Inconsistent candidate evaluation
+Global Capability Centers (GCCs) play a key role in large-scale hiring across technology, operations, and support roles.  
+However, many GCC hiring workflows still depend on manual resume screening, Excel-based tracking, and unstructured interview feedback.
 
-High recruiter workload
+This project is a **simple AI-assisted hiring platform** that helps recruiters screen candidates faster while maintaining **human control, transparency, and fairness**.
 
-Candidate drop-offs due to delayed feedback
+The solution is designed as a **hackathon prototype**, focusing on clarity and practicality rather than complex or black-box AI.
 
-Traditional ATS systems lack intelligence, explainability, and human-in-loop control.
+---
 
-💡 Solution Overview
+## ❗ Problem Statement
 
-The AI-Powered GCC Hiring Intelligence Platform is an end-to-end, explainable, and human-assisted hiring system that:
+Hiring teams in GCCs commonly face the following challenges:
 
-Automates resume screening using AI
+- Manual resume shortlisting takes significant time
+- No consistent method to compare resumes with job descriptions
+- Interview feedback is often scattered and subjective
+- Candidates do not understand their application status
+- Limited transparency in hiring decisions
 
-Structures interview evaluation
+These issues slow down the hiring process and negatively affect both recruiters and candidates.
 
-Provides final hiring recommendations with human control
+---
 
-Improves decision speed, fairness, and transparency
+## 💡 Proposed Solution
 
-Designed specifically for Global Capability Centers.
+This project provides a **single platform** that:
 
-✨ Key Features
-📄 AI Resume Screening
+- Automates resume screening using explainable logic
+- Ranks candidates based on job relevance
+- Supports structured interview evaluation
+- Uses AI only as a **decision-support tool**
+- Improves candidate experience through feedback and chatbot support
 
-Job Description ↔ Resume semantic matching (TF-IDF)
+The system **assists humans**, not replaces them.
 
-Skill coverage analysis
+---
 
-Experience relevance scoring
+## 🧩 Functional Modules
 
-AI-generated hiring decision with reasoning
+### 🔹 Module 1: Resume Screening
 
-🎤 Interview Decision Intelligence
+- Recruiter enters a Job Description
+- Uploads multiple candidate resumes (PDF)
+- System:
+  - Extracts resume text
+  - Identifies relevant skills
+  - Matches resume content with JD
+  - Calculates a resume score
+  - Ranks candidates automatically
 
-Structured interview scoring
+---
 
-Weighted evaluation across technical & behavioral metrics
+### 🔹 Module 2: Interview Evaluation
 
-Human-in-loop interview feedback capture
+- Interviewers rate candidates on:
+  - Technical skills
+  - Communication
+  - Problem solving
+  - Cultural fit
+- Interview score is calculated
+- Resume score and interview score are combined
+- Final ranking is generated
 
-📊 Final Hiring Tabulation
+---
 
-Combined Resume + Interview score
+### 🔹 Module 3: AI-Assisted Recommendation
 
-Transparent ranking & justification
+- System suggests:
+  - **HIRE**
+  - **REVIEW**
+  - **REJECT**
+- Each recommendation includes a short explanation
+- Final decision is always taken by the recruiter
 
-Manual override: Hire / Review / Reject
+---
 
-🧑‍⚖️ Human-in-the-Loop Control
+### 🔹 Module 4: Candidate Experience & Transparency
 
-Recruiter final decision stored per candidate
+- Candidates can:
+  - Check application status
+  - View feedback
+  - Practice interview questions
+  - Ask hiring-related questions via chatbot
+- Improves trust and communication
 
-AI suggestions remain advisory, not authoritative
+---
 
-📈 Interactive Dashboard
+### 🔹 Module 5: Role-Based Access
 
-Candidate ranking
+- **Admin Mode**
+  - Resume screening
+  - Candidate ranking
+  - Interview evaluation
+  - Final hiring decisions
 
-Shortlisting (Top-N selection)
+- **Candidate Mode**
+  - Interview preparation
+  - Status tracking
+  - Feedback viewing
+  - Chatbot support
 
-Explainable scoring views
+---
 
-🧠 Scoring Logic (Explainable & Judge-Friendly)
-Resume Score (100 points)
-Component	Weight
-JD ↔ Resume Similarity	50%
-Skill Match Coverage	30%
-Experience Relevance	20%
-Final Score
-Final Score = Resume Score (50%) + Interview Score (50%)
+## 🧠 AI & Logic Used
+
+The project intentionally uses **simple and explainable methods**:
+
+- **TF-IDF + Cosine Similarity** for JD–resume matching
+- **Rule-based scoring** for skills and experience
+- **Large Language Model (Groq API)** used only for:
+  - Explanations
+  - Chatbot responses
+  - Interview assistance
+
+No automatic or hidden decisions are made by AI.
+
+---
+
+## 🏗️ System Architecture (High Level)
+Admin / Candidate
+↓
+Streamlit Interface
+↓
+Resume & Interview Processing
+↓
+AI Assistance (Optional)
+↓
+Session-Based Data Storage
 
 
-This ensures:
+This lightweight architecture is suitable for a hackathon prototype.
 
-Skill-relevant candidates rank higher
+---
 
-Interviews can change final outcomes
+## 🛠️ Technology Stack
 
-Decisions remain transparent & auditable
+| Layer | Technology |
+|------|-----------|
+| Language | Python |
+| UI | Streamlit |
+| Data Handling | pandas |
+| PDF Parsing | pypdf |
+| Text Matching | scikit-learn |
+| AI Assistance | Groq API (LLM) |
 
-🛠 Tech Stack
-Layer	Technology
-Frontend	Streamlit
-Backend	Python
-AI / NLP	TF-IDF, Cosine Similarity
-LLM	Groq (LLaMA 3.1)
-Data	Pandas
-Deployment	Streamlit Community Cloud
-☁️ Deployment
+---
 
-The application is deployed using Streamlit Community Cloud, enabling:
+## ▶️ How to Run the Application
 
-Secure access
+### Step 1: Install Dependencies
+```bash
+pip install -r requirements.txt
 
-Rapid iteration
+Step 2: Run the App
+streamlit run app.py
 
-Live demo capability
+Step 3: AI Configuration (Optional)
 
-▶️ Live Demo
+Add GROQ_API_KEY in Streamlit or Replit secrets.
 
-🔗 [Add your Streamlit Cloud URL here]
+The application works even without the API key using fallback logic.
 
-Example:
+🎯 Hackathon Alignment
 
-https://gcc-hiring-intelligence.streamlit.app
+This solution directly aligns with Option 1: Hiring in GCCs by:
 
-🏆 Why This Solution Stands Out
+Reducing manual resume screening
 
-✔ Explainable AI (no black-box decisions)
-✔ Human-controlled final hiring
-✔ GCC-specific hiring intelligence
-✔ Hackathon-ready architecture
-✔ Production-scalable design
+Supporting structured hiring decisions
 
-📌 Future Enhancements
+Improving recruiter efficiency
 
-Candidate drop-off risk prediction
+Enhancing candidate transparency
 
-Automated email engagement workflows
+Using AI responsibly with human oversight
 
-Recruiter analytics dashboard
+⚠️ Limitations
 
-Multi-role hiring support
+Uses session-based storage (no database)
 
-Real-time chatbot hiring assistant
+Designed as a prototype, not production-ready
 
-👨‍💻 Built For
+Skill extraction is keyword-based
 
-Global Capability Centers
+🚀 Future Enhancements
 
-Talent Acquisition Teams
+Database integration
 
-Hackathons & Innovation Challenges
+Advanced skill extraction
+
+Historical hiring insights
+
+Multi-round interview workflows
+
+Analytics dashboard for recruiters
+
+👨‍💻 Author
+
+Harsh
+Participant – GCC X-Shift Hackathon 2025
+
+🙌 Final Note
+
+This project demonstrates how simple, explainable AI can meaningfully improve GCC hiring processes while keeping humans fully in control of decisions.
+
+
+---
+
+## 🏁 You Are 100% READY
+
+✔ Complete  
+✔ Professional  
+✔ Human  
+✔ Judge-friendly  
+✔ Submission-safe  
+
+If you want next:
+- 🎥 Demo walkthrough script  
+- 📊 PPT content from README  
+- 🔥 One-line project tagline  
+
+Just say the word 💪
+
