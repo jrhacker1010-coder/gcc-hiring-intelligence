@@ -12,10 +12,19 @@ st.set_page_config(page_title="GCC AI Hiring Platform", layout="wide")
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1f2937;
-        margin-bottom: 1rem;
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(120deg, #2563eb 0%, #7c3aed 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+    .subtitle {
+        text-align: center;
+        color: #6b7280;
+        font-size: 1rem;
+        margin-bottom: 2rem;
     }
     .section-header {
         font-size: 1.5rem;
@@ -23,18 +32,21 @@ st.markdown("""
         color: #374151;
         margin-top: 2rem;
         margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
     }
     .candidate-card {
-        background: #f9fafb;
-        padding: 1rem;
-        border-radius: 8px;
+        background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+        padding: 1.25rem;
+        border-radius: 12px;
         border-left: 4px solid #3b82f6;
         margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .score-badge {
         display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 12px;
+        padding: 0.35rem 0.85rem;
+        border-radius: 16px;
         font-weight: 600;
         font-size: 0.875rem;
     }
@@ -42,20 +54,60 @@ st.markdown("""
     .score-medium { background: #fef3c7; color: #92400e; }
     .score-low { background: #fee2e2; color: #991b1b; }
     .comment-box {
-        background: #f3f4f6;
-        padding: 0.75rem;
-        border-radius: 6px;
-        margin-bottom: 0.5rem;
-        border-left: 3px solid #9ca3af;
+        background: #ffffff;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        border-left: 3px solid #3b82f6;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     .comment-author {
         font-weight: 600;
-        color: #374151;
-        font-size: 0.875rem;
+        color: #1f2937;
+        font-size: 0.9rem;
     }
     .comment-time {
-        color: #6b7280;
+        color: #9ca3af;
         font-size: 0.75rem;
+    }
+    .chat-message-user {
+        background: #eff6ff;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        margin: 0.5rem 0;
+        border-left: 3px solid #3b82f6;
+    }
+    .chat-message-assistant {
+        background: #f9fafb;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        margin: 0.5rem 0;
+        border-left: 3px solid #10b981;
+    }
+    .status-card {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #bae6fd;
+        margin-bottom: 1.5rem;
+    }
+    .login-container {
+        max-width: 500px;
+        margin: 3rem auto;
+        padding: 2rem;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stButton>button {
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    .stTextInput>div>div>input {
+        border-radius: 8px;
+    }
+    .stTextArea>div>div>textarea {
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -364,50 +416,60 @@ Give constructive feedback on clarity, relevance, and completeness."""
 
 if not st.session_state.logged_in:
     st.markdown('<p class="main-header">🎯 GCC AI Hiring Platform</p>', unsafe_allow_html=True)
-    st.markdown("### Select Your Role")
+    st.markdown('<p class="subtitle">Streamlining Global Capability Center Recruitment</p>', unsafe_allow_html=True)
     
-    role_choice = st.radio("I am a:", ["Admin", "Candidate"])
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
+    st.markdown("### 🔐 Welcome! Select Your Role")
+    
+    role_choice = st.radio("I am a:", ["Admin", "Candidate"], horizontal=True)
     
     if role_choice == "Admin":
-        st.markdown("#### Admin Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        st.markdown("#### 👨‍💼 Admin Login")
+        username = st.text_input("Username", placeholder="Enter username")
+        password = st.text_input("Password", type="password", placeholder="Enter password")
         
-        if st.button("Login"):
+        if st.button("🚀 Login", use_container_width=True):
             if username == "admin" and password == "123":
                 st.session_state.logged_in = True
                 st.session_state.user_role = "admin"
                 st.rerun()
             else:
-                st.error("Invalid credentials")
+                st.error("❌ Invalid credentials")
     
     else:
-        st.markdown("#### Candidate Login")
-        candidate_name = st.text_input("Enter your name (as on resume)")
+        st.markdown("#### 👤 Candidate Access")
+        candidate_name = st.text_input("Enter your name (as on resume)", placeholder="John Doe")
         
-        if st.button("Continue"):
+        if st.button("🚀 Continue", use_container_width=True):
             if candidate_name:
                 st.session_state.logged_in = True
                 st.session_state.user_role = "candidate"
                 st.session_state.candidate_name = candidate_name
                 st.rerun()
             else:
-                st.error("Please enter your name")
+                st.error("❌ Please enter your name")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     st.markdown('<p class="main-header">🎯 GCC AI Hiring Platform</p>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">Intelligent Recruitment Management System</p>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([6, 1])
+    col1, col2, col3 = st.columns([5, 2, 1])
     with col1:
-        st.write(f"**Logged in as:** {st.session_state.user_role.upper()}")
-        if st.session_state.user_role == "candidate":
-            st.write(f"**Name:** {st.session_state.candidate_name}")
+        role_badge = "👨‍💼 ADMIN" if st.session_state.user_role == "admin" else "👤 CANDIDATE"
+        st.markdown(f'<div style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); padding: 0.75rem 1.5rem; border-radius: 8px; color: white; font-weight: 600;">{role_badge}</div>', unsafe_allow_html=True)
     with col2:
-        if st.button("Logout"):
+        if st.session_state.user_role == "candidate":
+            st.markdown(f'<div style="background: #f3f4f6; padding: 0.75rem 1rem; border-radius: 8px; font-weight: 500; text-align: center;">{st.session_state.candidate_name}</div>', unsafe_allow_html=True)
+    with col3:
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.user_role = None
             st.session_state.candidate_name = None
             st.rerun()
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     
     if st.session_state.user_role == "admin":
         tab1, tab2, tab3 = st.tabs(["📋 Hiring Process", "💬 Admin Chatbot", "💭 Feedback"])
@@ -606,9 +668,9 @@ else:
             
             for msg in st.session_state.admin_chat_history:
                 if msg["role"] == "user":
-                    st.markdown(f"**You:** {msg['content']}")
+                    st.markdown(f'<div class="chat-message-user"><strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f"**Assistant:** {msg['content']}")
+                    st.markdown(f'<div class="chat-message-assistant"><strong>Assistant:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
             
             user_input = st.text_input("Ask a question", key="chat_input", placeholder="e.g., Top 5 candidates?")
             
@@ -650,18 +712,20 @@ else:
                     break
             
             if candidate_data:
+                st.markdown('<div class="status-card">', unsafe_allow_html=True)
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.metric("Resume Score", f"{candidate_data['score']}%")
+                    st.metric("📊 Resume Score", f"{candidate_data['score']}%")
                 with col2:
                     interview_score = st.session_state.interview_scores.get(st.session_state.candidate_name, 0)
-                    st.metric("Interview Score", f"{interview_score}%")
+                    st.metric("🎤 Interview Score", f"{interview_score}%")
                 with col3:
                     decision = st.session_state.final_decisions.get(st.session_state.candidate_name, "PENDING")
-                    st.metric("Status", decision)
+                    st.metric("✅ Status", decision)
+                st.markdown('</div>', unsafe_allow_html=True)
                 
-                st.markdown("#### Your Details")
+                st.markdown("#### 📋 Your Details")
                 st.write(f"**Experience:** {candidate_data['experience']} years")
                 st.write(f"**Matched Skills:** {', '.join(candidate_data['matched_skills']) if candidate_data['matched_skills'] else 'None'}")
                 st.write(f"**Skills to Develop:** {', '.join(candidate_data['missing_skills']) if candidate_data['missing_skills'] else 'None'}")
@@ -675,9 +739,9 @@ else:
             
             for msg in st.session_state.candidate_chat_history:
                 if msg["role"] == "user":
-                    st.markdown(f"**You:** {msg['content']}")
+                    st.markdown(f'<div class="chat-message-user"><strong>You:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f"**Assistant:** {msg['content']}")
+                    st.markdown(f'<div class="chat-message-assistant"><strong>Assistant:</strong> {msg["content"]}</div>', unsafe_allow_html=True)
             
             user_input = st.text_input("Ask a question", key="chat_input", placeholder="e.g., What is my status?")
             
