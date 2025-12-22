@@ -561,6 +561,33 @@ else:
                 
                 st.dataframe(results_df, use_container_width=True, hide_index=True)
                 
+                st.markdown("#### 💾 Export Results")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    csv = results_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Download as CSV",
+                        data=csv,
+                        file_name=f"screening_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                    )
+                
+                with col2:
+                    excel_buffer = pd.ExcelWriter('temp.xlsx', engine='xlsxwriter')
+                    results_df.to_excel(excel_buffer, index=False, sheet_name='Screening Results')
+                    excel_buffer.close()
+                    
+                    with open('temp.xlsx', 'rb') as f:
+                        excel_data = f.read()
+                    
+                    st.download_button(
+                        label="📥 Download as Excel",
+                        data=excel_data,
+                        file_name=f"screening_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                
                 st.markdown('<p class="section-header">🎤 Interview Evaluation</p>', unsafe_allow_html=True)
                 
                 candidate_names = [c["name"] for c in st.session_state.candidates_data]
